@@ -19,7 +19,7 @@
 | Команда | Статус |
 |---|---|
 | `doctor` | проверена 19.10.2026: версия Godot и плагина, имя и путь проекта, открытая сцена |
-| `scene inspect` | не реализована |
+| `scene inspect` | реализована (команда протокола `scene.inspect`, args: `path` — узел, с которого начать, по умолчанию корень; `depth` — глубина, -1 = все). Ответ: `scene_path`, `node_count`, `root` — дерево узлов, у каждого `name`, `type`, `path`, `children`, при наличии `script`, `instance`, для Node3D/Node2D `position`, `rotation_degrees`, `scale`, для Control `position`, `size` |
 | `scene apply` | не реализована |
 | `script set` | не реализована |
 | `game run / stop` | не реализована |

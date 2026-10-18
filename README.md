@@ -26,6 +26,7 @@
 2. В терминале, из папки проекта: `python tools\enginectl\enginectl.py doctor`
    (если `python` открывает Microsoft Store, использовать `py -3`).
 3. В ответе должно быть `"status": "ok"` и «Godot на связи».
+4. Открыть в редакторе сцену `scenes/inspect_test.tscn` и выполнить `python tools\enginectl\enginectl.py scene inspect`: в ответе дерево узлов Root → Floor, Cube, Sun, Camera.
 
 Самопроверка без терминала: `Godot --headless --path <папка проекта> --editor -- --ai-bridge-selftest`
 печатает ответы на верный и неверный токен и строку `AI Bridge selftest: PASS`.

@@ -56,13 +56,25 @@ def main() -> int:
     parser.add_argument("--project", type=Path, help="папка проекта Godot (по умолчанию ищется от текущей папки)")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("doctor", help="проверить, что Godot запущен и плагин отвечает")
+
+    scene = sub.add_parser("scene", help="работа с открытой в редакторе сценой")
+    scene_sub = scene.add_subparsers(dest="scene_command", required=True)
+    inspect = scene_sub.add_parser("inspect", help="прочитать дерево открытой сцены")
+    inspect.add_argument("--path", default=".", help="узел, с которого начать (по умолчанию корень сцены)")
+    inspect.add_argument("--depth", type=int, default=-1, help="сколько уровней вниз показать (-1 = все)")
     options = parser.parse_args()
+
+    if options.command == "scene":
+        command = f"scene.{options.scene_command}"
+        args = {"path": options.path, "depth": options.depth}
+    else:
+        command, args = options.command, {}
 
     project = options.project or find_project_root(Path.cwd()) or find_project_root(Path(__file__).resolve().parent)
     if project is None:
         response = fail("Не найден project.godot. Укажите папку проекта через --project")
     else:
-        response = send(project.resolve(), options.command, {})
+        response = send(project.resolve(), command, args)
 
     sys.stdout.reconfigure(encoding="utf-8")
     print(json.dumps(response, ensure_ascii=False, indent=2))
