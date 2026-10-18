@@ -393,7 +393,7 @@ func _coerce(node: Node, prop: String, value: Variant) -> Dictionary:
 		if typeof(value) == TYPE_DICTIONARY:
 			return _make_material(value)
 	if typeof(value) == TYPE_STRING and str(value).begins_with("res://"):
-		var res := load(str(value))
+		var res := _load_fresh(str(value))
 		if res == null:
 			return {"error": "ресурс «%s» не найден" % value}
 		return {"value": res}
@@ -430,6 +430,21 @@ func _coerce(node: Node, prop: String, value: Variant) -> Dictionary:
 			return {"value": NodePath(str(value))}
 		_:
 			return {"value": value}
+
+
+## Загружает ресурс по пути. Для скрипта сверяет текст с диском: редактор без фокуса не замечает
+## правок, сделанных снаружи (ИИ правит файл), и load() отдаёт из кэша старый текст без новых свойств.
+func _load_fresh(path: String) -> Resource:
+	var res := load(path)
+	if res is Script:
+		var file := FileAccess.open(path, FileAccess.READ)
+		if file != null:
+			var text := file.get_as_text()
+			file.close()
+			if text != res.source_code:
+				res.source_code = text
+				res.reload(true)
+	return res
 
 
 func _has_property(node: Node, prop: String) -> bool:
