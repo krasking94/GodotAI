@@ -8,6 +8,7 @@
 import argparse
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -21,6 +22,8 @@ STATE_DIR = Path(".godot") / "ai_bridge"
 CONNECTION_FILE = STATE_DIR / "connection.json"
 RUN_LOG = STATE_DIR / "last_run.log"
 RUN_INFO = STATE_DIR / "last_run.json"
+SCREENSHOT_PNG = STATE_DIR / "screenshot.png"
+SCREENSHOT_LOG = STATE_DIR / "screenshot.log"
 TIMEOUT_SECONDS = 10
 ERROR_PREFIXES = ("SCRIPT ERROR:", "ERROR:", "USER ERROR:")
 WARNING_PREFIXES = ("WARNING:", "USER WARNING:", "SCRIPT WARNING:")
@@ -126,14 +129,13 @@ def game_run(project: Path, options) -> dict:
         cmd.append("--headless")
     if options.scene:
         cmd.append(options.scene)
-    if options.test:
+    test_args = test_arguments(options.test)
+    if isinstance(test_args, dict):
+        return test_args
+    if test_args:
         # Всё после «--» Godot отдаёт скриптам как пользовательские аргументы (OS.get_cmdline_user_args).
         cmd.append("--")
-        for item in options.test:
-            who, sep, program = item.partition("=")
-            if not sep or not who.strip() or not program.strip():
-                return fail(f"--test ждёт вид КТО=ПРОГРАММА, например player=forward:1.5,enter:0.5 (получено: {item!r})")
-            cmd.append(f"--test-{who.strip()}={program.strip()}")
+        cmd.extend(test_args)
     (project / STATE_DIR).mkdir(parents=True, exist_ok=True)
     log_path = project / RUN_LOG
     started = time.time()
@@ -162,6 +164,103 @@ def game_run(project: Path, options) -> dict:
     if exit_code not in (0, None) and not stopped_by_us:
         warnings.append(f"Игра завершилась с кодом {exit_code}")
     return ok(summary, warnings=warnings)
+
+
+def test_arguments(items: list) -> list | dict:
+    """--test кто=программа → ["--test-кто=программа", ...]; при ошибке возвращает ответ fail()."""
+    result = []
+    for item in items or []:
+        who, sep, program = item.partition("=")
+        if not sep or not who.strip() or not program.strip():
+            return fail(f"--test ждёт вид КТО=ПРОГРАММА, например player=forward:1.5,enter:0.5 (получено: {item!r})")
+        result.append(f"--test-{who.strip()}={program.strip()}")
+    return result
+
+
+def png_size(path: Path) -> tuple[int, int] | None:
+    """Ширина и высота PNG из заголовка IHDR (без библиотек)."""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(24)
+    except OSError:
+        return None
+    if len(head) < 24 or head[:8] != b"\x89PNG\r\n\x1a\n" or head[12:16] != b"IHDR":
+        return None
+    return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
+
+
+def game_screenshot(project: Path, options) -> dict:
+    """Запускает сцену отдельным процессом Godot со скриптом game/screenshot.gd и сохраняет кадр в PNG."""
+    godot = find_godot(project, options.godot)
+    if godot is None:
+        return fail("Не найден исполняемый файл Godot: откройте проект в редакторе, положите Godot в папку проекта "
+                    "или на уровень выше, задайте переменную GODOT_EXE или укажите --godot <путь>")
+    if not (project / "game" / "screenshot.gd").is_file():
+        return fail("В проекте нет game/screenshot.gd (скрипт, который делает снимок)")
+    match = re.fullmatch(r"(\d{3,5})x(\d{3,5})", options.size or "")
+    if not match:
+        return fail(f"--size ждёт ШИРИНАxВЫСОТА, например 1280x720 (получено: {options.size!r})")
+    width, height = int(match.group(1)), int(match.group(2))
+    out = Path(options.out).expanduser() if options.out else project / SCREENSHOT_PNG
+    if not out.is_absolute():
+        out = Path.cwd() / out
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if out.exists():
+        out.unlink()
+    test_args = test_arguments(options.test)
+    if isinstance(test_args, dict):
+        return test_args
+
+    cmd = [str(godot), "--path", str(project), "--resolution", f"{width}x{height}", "--script", "res://game/screenshot.gd"]
+    virtual_display = False
+    if sys.platform.startswith("linux") and not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+        if shutil.which("xvfb-run") is None:
+            return fail("Нет экрана (переменная DISPLAY пуста) и нет xvfb-run: окно для снимка открыть негде. "
+                        "Установите пакет xvfb или запускайте там, где есть экран")
+        # Виртуальный экран без видеокарты: программный OpenGL (llvmpipe) вместо Vulkan.
+        cmd = ["xvfb-run", "-a", "-s", f"-screen 0 {width}x{height}x24"] + cmd + [
+            "--rendering-driver", "opengl3", "--rendering-method", "gl_compatibility"]
+        virtual_display = True
+    user_args = [f"--shot-out={out}", f"--shot-after={options.after}"]
+    if options.scene:
+        user_args.append(f"--shot-scene={options.scene}")
+    cmd += ["--"] + user_args + test_args
+
+    (project / STATE_DIR).mkdir(parents=True, exist_ok=True)
+    timeout = options.after + 90
+    started = time.time()
+    try:
+        completed = subprocess.run(cmd, cwd=project, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return fail(f"Снимок не сделан: игра не завершилась за {timeout:.0f} с")
+    except OSError as exc:
+        return fail(f"Не удалось запустить Godot: {exc}")
+    duration = round(time.time() - started, 2)
+    log_path = project / SCREENSHOT_LOG
+    log_path.write_text(f"# enginectl game screenshot {datetime.now():%Y-%m-%d %H:%M:%S}\n# {' '.join(cmd)}\n"
+                        + completed.stdout.decode("utf-8", errors="replace"), encoding="utf-8")
+    summary = parse_log(project, SCREENSHOT_LOG)
+    # Шум виртуального экрана (нет звуковой карты, vsync) снимку не мешает.
+    noise = ("ALSA", "vsync", "V-Sync", "snd_", "audio")
+
+    def is_noise(entry: dict) -> bool:
+        text = " ".join([entry["message"], *entry["details"]])
+        return any(n in text for n in noise)
+
+    summary["errors"] = [e for e in summary["errors"] if not is_noise(e)]
+    summary["warnings"] = [w for w in summary["warnings"] if not is_noise(w)]
+    summary["output"] = [line for line in summary["output"] if not line.startswith("ALSA lib")]
+    size = png_size(out)
+    if size is None:
+        return {"status": "error", "result": {"exit_code": completed.returncode, "duration": duration,
+                                              "log_path": str(log_path), "output": summary["output"][-20:]},
+                "errors": [e["message"] for e in summary["errors"]] or [f"Файл {out} не появился (код выхода {completed.returncode})"],
+                "warnings": [w["message"] for w in summary["warnings"]], "files": []}
+    return ok({"path": str(out), "width": size[0], "height": size[1], "scene": options.scene or "<главная сцена>",
+               "after": options.after, "virtual_display": virtual_display, "duration": duration,
+               "exit_code": completed.returncode, "log_path": str(log_path), "output": summary["output"][-20:],
+               "errors_in_game": summary["errors"], "hint": "Открой PNG и опиши, что видно; потом правь сцену"},
+              files=[str(out)], warnings=[w["message"] for w in summary["warnings"]])
 
 
 def wait_or_stop(proc: subprocess.Popen, seconds: float) -> tuple[int | None, bool]:
@@ -239,9 +338,9 @@ def game_status(project: Path) -> dict:
     return ok({"running": running, "last_run": info})
 
 
-def parse_log(project: Path) -> dict:
-    """Разбирает лог последнего запуска на ошибки, предупреждения и обычный вывод."""
-    log_path = project / RUN_LOG
+def parse_log(project: Path, log_file: Path = RUN_LOG) -> dict:
+    """Разбирает лог запуска игры на ошибки, предупреждения и обычный вывод."""
+    log_path = project / log_file
     if not log_path.is_file():
         return {"errors": [], "warnings": [], "output": [], "line_count": 0}
     errors, warnings, output = [], [], []
@@ -345,6 +444,14 @@ def build_parser() -> argparse.ArgumentParser:
                      help="программа самопроверки для скрипта игры, например player=forward:1.5,enter:0.5,wait:2,exit:0.5 "
                           "или car=gas:2,brake:1 (можно указать несколько раз); скрипт печатает результат фаз в лог")
     run.add_argument("--godot", help="путь к исполняемому файлу Godot, если редактор закрыт")
+    shot = game_sub.add_parser("screenshot", help="запустить сцену, подождать и сохранить кадр в PNG (нужно окно; без экрана на Linux берётся xvfb-run)")
+    shot.add_argument("--scene", help="какую сцену снимать, например res://scenes/yard.tscn (иначе главная)")
+    shot.add_argument("--out", help="куда сохранить PNG (по умолчанию .godot/ai_bridge/screenshot.png)")
+    shot.add_argument("--after", type=float, default=2.0, help="сколько секунд дать игре поработать до снимка (по умолчанию 2)")
+    shot.add_argument("--size", default="1280x720", help="размер окна и снимка, по умолчанию 1280x720")
+    shot.add_argument("--test", action="append", default=[], metavar="КТО=ПРОГРАММА",
+                      help="программы самопроверки, как у game run (например player=forward:1.5,enter:0.5)")
+    shot.add_argument("--godot", help="путь к исполняемому файлу Godot, если редактор закрыт")
     game_sub.add_parser("stop", help="остановить запущенную игру")
     game_sub.add_parser("status", help="запущена ли игра и что было в последнем запуске")
 
@@ -419,6 +526,8 @@ def dispatch(project: Path, options) -> dict:
     if options.command == "game":
         if options.game_command == "run":
             return game_run(project, options)
+        if options.game_command == "screenshot":
+            return game_screenshot(project, options)
         if options.game_command == "stop":
             return game_stop(project)
         return game_status(project)
