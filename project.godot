@@ -1,0 +1,8 @@
+; Файл проекта Godot. Редактор сам допишет сюда нужные настройки при первом открытии.
+
+config_version=5
+
+[application]
+
+config/name="GodotAI"
+config/features=PackedStringArray("4.7")

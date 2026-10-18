@@ -1,0 +1,30 @@
+# Служебные папки Godot
+.godot/
+.import/
+export_presets.cfg
+*.translation
+
+# Сборки
+build/
+exports/
+*.apk
+*.aab
+*.exe
+*.pck
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Секреты
+.env
+*.key
+*.keystore
+secrets/
+
+# Система
+.DS_Store
+Thumbs.db
+desktop.ini
