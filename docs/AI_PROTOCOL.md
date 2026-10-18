@@ -40,7 +40,8 @@
 - `"res://путь"` → загружается ресурс (меш, материал, сцена).
 - `mesh`: `{"primitive": "box"|"plane"|"sphere"|"cylinder"|"capsule", "size": [...], "radius": r, "height": h, "color": ...}`.
 - `material_override`: `{"color": ...}` → StandardMaterial3D.
-- `shape` (у CollisionShape3D): `{"primitive": "box"|"sphere"|"capsule"|"cylinder", "size": [x, y, z], "radius": r, "height": h}` → BoxShape3D, SphereShape3D, CapsuleShape3D, CylinderShape3D. Физика в Godot: видимый меш и невидимая форма столкновения — разные узлы, поэтому пол делается как StaticBody3D с детьми MeshInstance3D и CollisionShape3D, персонаж — CharacterBody3D с CollisionShape3D и Camera3D (пример: `examples/yard.json`).
+- `shape` (у CollisionShape3D): `{"primitive": "box"|"sphere"|"capsule"|"cylinder", "size": [x, y, z], "radius": r, "height": h}` → BoxShape3D, SphereShape3D, CapsuleShape3D, CylinderShape3D.
+- `environment` (у WorldEnvironment): `{"sky": true, "sky_color": ..., "horizon_color": ..., "ground_color": ..., "ambient_energy": 0.8, "fog": false}` → Environment с процедурным небом и рассеянным светом от неба. Без него теневые стороны объектов чёрные. Физика в Godot: видимый меш и невидимая форма столкновения — разные узлы, поэтому пол делается как StaticBody3D с детьми MeshInstance3D и CollisionShape3D, персонаж — CharacterBody3D с CollisionShape3D и Camera3D (пример: `examples/yard.json`).
 
 В `plan` для мешей показываются тип, размер и цвет (`{"mesh": "BoxMesh", "size": [...], "color": [...]}`).
 

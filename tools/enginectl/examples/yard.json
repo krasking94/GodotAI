@@ -1,41 +1,226 @@
 {
-  "phrase": "Сделай двор: пол, две стены и свет, и персонажа, которым можно ходить по двору и смотреть по сторонам",
+  "phrase": "Сделай двор под открытым небом: пол, две стены, солнце с тенями, и персонажа, которым можно ходить и бегать по двору и смотреть по сторонам",
   "scene": {
     "path": "res://scenes/yard.tscn",
     "root_type": "Node3D",
     "root_name": "Yard"
   },
   "ops": [
-    {"op": "create", "parent": ".", "name": "Ground", "type": "StaticBody3D"},
-    {"op": "create", "parent": "Ground", "name": "Mesh", "type": "MeshInstance3D",
-     "props": {"mesh": {"primitive": "plane", "size": [12, 12], "color": "#6b8e23"}}},
-    {"op": "create", "parent": "Ground", "name": "Shape", "type": "CollisionShape3D",
-     "props": {"shape": {"primitive": "box", "size": [12, 0.2, 12]}, "position": [0, -0.1, 0]}},
-
-    {"op": "create", "parent": ".", "name": "WallNorth", "type": "StaticBody3D",
-     "props": {"position": [0, 1, -6]}},
-    {"op": "create", "parent": "WallNorth", "name": "Mesh", "type": "MeshInstance3D",
-     "props": {"mesh": {"primitive": "box", "size": [12, 2, 0.3], "color": "#b0b0b0"}}},
-    {"op": "create", "parent": "WallNorth", "name": "Shape", "type": "CollisionShape3D",
-     "props": {"shape": {"primitive": "box", "size": [12, 2, 0.3]}}},
-
-    {"op": "create", "parent": ".", "name": "WallEast", "type": "StaticBody3D",
-     "props": {"position": [6, 1, 0]}},
-    {"op": "create", "parent": "WallEast", "name": "Mesh", "type": "MeshInstance3D",
-     "props": {"mesh": {"primitive": "box", "size": [0.3, 2, 12], "color": "#b0b0b0"}}},
-    {"op": "create", "parent": "WallEast", "name": "Shape", "type": "CollisionShape3D",
-     "props": {"shape": {"primitive": "box", "size": [0.3, 2, 12]}}},
-
-    {"op": "create", "parent": ".", "name": "Lamp", "type": "DirectionalLight3D",
-     "props": {"position": [0, 6, 0], "rotation_degrees": [-50, 30, 0]}},
-
-    {"op": "create", "parent": ".", "name": "Player", "type": "CharacterBody3D",
-     "props": {"position": [0, 1, 4], "script": "res://game/player.gd"}},
-    {"op": "create", "parent": "Player", "name": "Shape", "type": "CollisionShape3D",
-     "props": {"shape": {"primitive": "capsule", "radius": 0.4, "height": 1.8}}},
-    {"op": "create", "parent": "Player", "name": "Camera", "type": "Camera3D",
-     "props": {"position": [0, 0.7, 0], "current": true}},
-
-    {"op": "set", "path": ".", "props": {"script": "res://game/yard.gd"}}
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Ground",
+      "type": "StaticBody3D"
+    },
+    {
+      "op": "create",
+      "parent": "Ground",
+      "name": "Mesh",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "plane",
+          "size": [
+            12,
+            12
+          ],
+          "color": "#6b8e23"
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Ground",
+      "name": "Shape",
+      "type": "CollisionShape3D",
+      "props": {
+        "shape": {
+          "primitive": "box",
+          "size": [
+            12,
+            0.2,
+            12
+          ]
+        },
+        "position": [
+          0,
+          -0.1,
+          0
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "WallNorth",
+      "type": "StaticBody3D",
+      "props": {
+        "position": [
+          0,
+          1,
+          -6
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "WallNorth",
+      "name": "Mesh",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "box",
+          "size": [
+            12,
+            2,
+            0.3
+          ],
+          "color": "#b0b0b0"
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": "WallNorth",
+      "name": "Shape",
+      "type": "CollisionShape3D",
+      "props": {
+        "shape": {
+          "primitive": "box",
+          "size": [
+            12,
+            2,
+            0.3
+          ]
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "WallEast",
+      "type": "StaticBody3D",
+      "props": {
+        "position": [
+          6,
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "WallEast",
+      "name": "Mesh",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "box",
+          "size": [
+            0.3,
+            2,
+            12
+          ],
+          "color": "#b0b0b0"
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": "WallEast",
+      "name": "Shape",
+      "type": "CollisionShape3D",
+      "props": {
+        "shape": {
+          "primitive": "box",
+          "size": [
+            0.3,
+            2,
+            12
+          ]
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Lamp",
+      "type": "DirectionalLight3D",
+      "props": {
+        "position": [
+          0,
+          6,
+          0
+        ],
+        "rotation_degrees": [
+          -50,
+          30,
+          0
+        ],
+        "shadow_enabled": true
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Sky",
+      "type": "WorldEnvironment",
+      "props": {
+        "environment": {
+          "sky": true,
+          "sky_color": "#4a86d8",
+          "horizon_color": "#b8d2f0",
+          "ambient_energy": 0.8
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Player",
+      "type": "CharacterBody3D",
+      "props": {
+        "position": [
+          0,
+          1,
+          4
+        ],
+        "script": "res://game/player.gd"
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Player",
+      "name": "Shape",
+      "type": "CollisionShape3D",
+      "props": {
+        "shape": {
+          "primitive": "capsule",
+          "radius": 0.4,
+          "height": 1.8
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Player",
+      "name": "Camera",
+      "type": "Camera3D",
+      "props": {
+        "position": [
+          0,
+          0.7,
+          0
+        ],
+        "current": true
+      }
+    },
+    {
+      "op": "set",
+      "path": ".",
+      "props": {
+        "script": "res://game/yard.gd"
+      }
+    }
   ]
 }

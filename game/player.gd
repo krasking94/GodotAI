@@ -1,12 +1,13 @@
 extends CharacterBody3D
 
 ## Персонаж от первого лица.
-## Управление: W A S D (или стрелки) — ходьба, мышь — обзор, пробел — прыжок,
+## Управление: W A S D (или стрелки) — ходьба, Shift — бег, мышь — обзор, пробел — прыжок,
 ## Esc — отпустить мышь, щелчок по окну игры — снова захватить.
 ## Через секунду после старта печатает, стоит ли на полу: по этой строке ИИ
 ## проверяет в логе, что персонаж не провалился.
 
 const SPEED := 4.0
+const RUN_SPEED := 8.0  # с зажатым Shift
 const JUMP_VELOCITY := 4.5
 const MOUSE_SENSITIVITY := 0.003
 const FALL_LIMIT_Y := -10.0  # ниже этой высоты считаем, что упал за край двора
@@ -51,8 +52,9 @@ func _physics_process(delta: float) -> void:
 	if Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT):
 		input.x += 1.0
 	var direction := (transform.basis * Vector3(input.x, 0.0, input.y)).normalized()
-	velocity.x = direction.x * SPEED
-	velocity.z = direction.z * SPEED
+	var speed := RUN_SPEED if Input.is_physical_key_pressed(KEY_SHIFT) else SPEED
+	velocity.x = direction.x * speed
+	velocity.z = direction.z * speed
 	move_and_slide()
 
 	if position.y < FALL_LIMIT_Y:
