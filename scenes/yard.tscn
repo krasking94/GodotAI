@@ -1,0 +1,44 @@
+[gd_scene format=3 uid="uid://baecypi3hngpu"]
+
+[ext_resource type="Script" uid="uid://c0nqpwgf125k7" path="res://game/yard.gd" id="1_e7vks"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_e3kx7"]
+albedo_color = Color(0.41960785, 0.5568628, 0.13725491, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_cvr5o"]
+material = SubResource("StandardMaterial3D_e3kx7")
+size = Vector2(12, 12)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_g7wxf"]
+albedo_color = Color(0.6901961, 0.6901961, 0.6901961, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_sclpj"]
+material = SubResource("StandardMaterial3D_g7wxf")
+size = Vector3(12, 2, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gkmhu"]
+albedo_color = Color(0.6901961, 0.6901961, 0.6901961, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_0xw55"]
+material = SubResource("StandardMaterial3D_gkmhu")
+size = Vector3(0.3, 2, 12)
+
+[node name="Yard" type="Node3D" unique_id=923702904]
+script = ExtResource("1_e7vks")
+
+[node name="Ground" type="MeshInstance3D" parent="." unique_id=1340479336]
+mesh = SubResource("PlaneMesh_cvr5o")
+
+[node name="WallNorth" type="MeshInstance3D" parent="." unique_id=1333479776]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -6)
+mesh = SubResource("BoxMesh_sclpj")
+
+[node name="WallEast" type="MeshInstance3D" parent="." unique_id=454148916]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1, 0)
+mesh = SubResource("BoxMesh_0xw55")
+
+[node name="Lamp" type="DirectionalLight3D" parent="." unique_id=155626929]
+transform = Transform3D(0.8660254, -0.38302222, 0.32139382, 0, 0.64278764, 0.76604444, -0.5, -0.66341394, 0.5566704, 0, 6, 0)
+
+[node name="Camera" type="Camera3D" parent="." unique_id=1823619159]
+transform = Transform3D(1, 0, 0, 0, 0.95105654, 0.309017, 0, -0.309017, 0.95105654, 0, 4, 12)

@@ -5,7 +5,7 @@ extends EditorPlugin
 ## Запрос: {"token": "...", "command": "doctor", "args": {}}
 ## Ответ:  {"status": "ok"|"error", "result": {...}, "errors": [], "warnings": [], "files": []}
 
-const PLUGIN_VERSION := "0.3.0"
+const PLUGIN_VERSION := "0.4.0"
 const HOST := "127.0.0.1"
 const DEFAULT_PORT := 47615
 const PORT_TRIES := 10
@@ -164,6 +164,10 @@ func _handle_line(line: String) -> Dictionary:
 			return _scene_new(args)
 		"scene.open":
 			return _scene_open(args)
+		"script.set":
+			return _script_set(args)
+		"project.main_scene":
+			return _project_main_scene(args)
 		"scene.undo":
 			return _scene_undo(true)
 		"scene.redo":
@@ -648,7 +652,9 @@ func _doctor() -> Dictionary:
 		"plugin_version": PLUGIN_VERSION,
 		"project_name": ProjectSettings.get_setting("application/config/name", ""),
 		"project_path": ProjectSettings.globalize_path("res://"),
+		"godot_executable": OS.get_executable_path(),
 		"edited_scene": _edited_scene_path(),
+		"main_scene": str(ProjectSettings.get_setting("application/run/main_scene", "")),
 	}
 
 
@@ -681,7 +687,8 @@ func _write_connection_file() -> void:
 	if file == null:
 		push_error("AI Bridge: не удалось записать файл подключения")
 		return
-	file.store_string(JSON.stringify({"host": HOST, "port": _port, "token": _token, "pid": OS.get_process_id()}, "\t"))
+	file.store_string(JSON.stringify({"host": HOST, "port": _port, "token": _token, "pid": OS.get_process_id(),
+		"godot_exe": OS.get_executable_path(), "project_path": ProjectSettings.globalize_path("res://")}, "\t"))
 
 
 ## Отмена или повтор последнего действия в истории открытой сцены (то же, что Ctrl+Z / Ctrl+Y).
@@ -714,3 +721,76 @@ func _scene_open(args: Dictionary) -> Dictionary:
 		return _error("Файл «%s» не найден" % path)
 	EditorInterface.open_scene_from_path(path)
 	return _ok({"scene_path": path})
+
+
+# ---------------------------------------------------------------------------
+# script.set: записать GDScript в файл и (по желанию) повесить его на узел открытой сцены.
+# args: path ("res://game/hello.gd"), content (текст скрипта), node (путь узла, необязательно).
+# Ответ: files = [path], parse_error — текст ошибки разбора, если скрипт не компилируется.
+# ---------------------------------------------------------------------------
+
+func _script_set(args: Dictionary) -> Dictionary:
+	var path := str(args.get("path", ""))
+	if not path.begins_with("res://") or not path.ends_with(".gd") or path.contains(".."):
+		return _error("path должен быть вида res://папка/имя.gd")
+	if not args.has("content") or typeof(args.content) != TYPE_STRING:
+		return _error("content должен быть строкой с текстом скрипта")
+	var node: Node = null
+	var root := EditorInterface.get_edited_scene_root()
+	var node_path := str(args.get("node", ""))
+	if node_path != "":
+		if root == null:
+			return _error("В редакторе не открыта ни одна сцена, некуда вешать скрипт")
+		node = root if node_path == "." else root.get_node_or_null(node_path)
+		if node == null:
+			return _error("Узел «%s» не найден" % node_path)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
+	var existed := FileAccess.file_exists(path)
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		return _error("Не удалось записать «%s»: %s" % [path, error_string(FileAccess.get_open_error())])
+	file.store_string(args.content)
+	file.close()
+	var fs := EditorInterface.get_resource_filesystem()
+	if existed:
+		fs.update_file(path)
+	else:
+		fs.scan()
+	var script: Script = load(path)
+	if script == null:
+		return _error("Файл записан, но Godot не смог загрузить его как скрипт: %s" % path)
+	var result := {"path": path, "created": not existed}
+	# load() отдаёт уже закэшированный скрипт со старым текстом, поэтому обновляем его явно.
+	script.source_code = args.content
+	var reload_err := script.reload(true)
+	if reload_err != OK:
+		result["parse_error"] = "скрипт не компилируется (%s), подробности в выводе редактора и в enginectl game run" % error_string(reload_err)
+	if node != null:
+		var ur := get_undo_redo()
+		ur.create_action("AI Bridge: script set %s" % node.name, UndoRedo.MERGE_DISABLE, root)
+		ur.add_do_property(node, "script", script)
+		ur.add_undo_property(node, "script", node.get_script())
+		ur.commit_action()
+		EditorInterface.mark_scene_as_unsaved()
+		result["attached_to"] = node_path
+	var response := _ok(result)
+	response["files"] = [path]
+	if result.has("parse_error"):
+		response["warnings"] = [result["parse_error"]]
+	return response
+
+
+## Назначает главную сцену проекта (её запускает кнопка «Запустить» и enginectl game run без --scene).
+func _project_main_scene(args: Dictionary) -> Dictionary:
+	var path := str(args.get("path", ""))
+	if not path.begins_with("res://") or not path.ends_with(".tscn") or path.contains(".."):
+		return _error("path должен быть вида res://папка/имя.tscn")
+	if not FileAccess.file_exists(path):
+		return _error("Файл «%s» не найден" % path)
+	ProjectSettings.set_setting("application/run/main_scene", path)
+	var err := ProjectSettings.save()
+	if err != OK:
+		return _error("Не удалось сохранить настройки проекта: %s" % error_string(err))
+	var response := _ok({"main_scene": path})
+	response["files"] = ["res://project.godot"]
+	return response
