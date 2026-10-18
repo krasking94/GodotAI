@@ -1,6 +1,6 @@
 # HANDOFF — где остановились
 
-**Дата:** 19.10.2026 (ночь с 18 на 19)
+**Дата:** 19.10.2026
 
 **Сделано:**
 - Окружение владельца проверено: Godot 4.7.2 в `F:\Godot`, Python 3.12.10 (в cmd работает `python`, в PowerShell надёжнее `py -3`), Git.
@@ -14,4 +14,8 @@
 
 **Замечено также:** после обновления файлов плагина редактору нужен «Проект → Перезагрузить текущий проект», иначе он работает со старой версией.
 
-**Следующий шаг:** дни 4–5 плана — `scene apply` (создание и изменение примитивов через Undo/Redo), сначала режим «покажи план».
+**Дни 4–5 (ветка scene-apply):** `scene apply` (create/set/delete, dry_run, Undo/Redo одним действием), `scene new`, `scene open`, `scene save`, `scene undo`/`redo`. Проверено в headless-редакторе Godot 4.7.2 (Linux, в облачной среде Claude): полный цикл new → apply → inspect → set/delete → ошибки → undo → redo → save → open. В headless при save в логе `ERROR: Parameter "t" is null` из создания миниатюры (dummy-рендер), к плагину не относится.
+
+**Как проверять без владельца:** скачать Godot Linux в среду, `Godot --headless --path <проект> --editor` в фоне, затем `python3 tools/enginectl/enginectl.py ...`. Проверка синтаксиса: `--headless --check-only --script res://addons/ai_bridge/plugin.gd`.
+
+**Следующий шаг:** день 6 плана — `game run / stop` и `log get` (запуск игры из редактора и чтение ошибок).

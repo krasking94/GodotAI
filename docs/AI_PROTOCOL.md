@@ -20,8 +20,23 @@
 |---|---|
 | `doctor` | проверена 19.10.2026: версия Godot и плагина, имя и путь проекта, открытая сцена |
 | `scene inspect` | проверена 19.10.2026 (команда протокола `scene.inspect`, args: `path` — узел, с которого начать, по умолчанию корень; `depth` — глубина, -1 = все). Ответ: `scene_path`, `node_count`, `root` — дерево узлов, у каждого `name`, `type`, `path`, `children`, при наличии `script`, `instance`, для Node3D/Node2D `position`, `rotation_degrees`, `scale`, для Control `position`, `size` |
-| `scene apply` | не реализована |
+| `scene apply` | проверена 19.10.2026 в headless-редакторе (команда `scene.apply`, args: `ops` — список операций, `dry_run`). Операции: `create` (parent, name, type, props), `set` (path, props), `delete` (path). Сначала проверяются все операции, при любой ошибке не применяется ничего. Применение — одно действие Undo/Redo редактора (Ctrl+Z отменяет весь набор). Ответ: `plan` (что создано/изменено/удалено, для set — старое и новое значение), `applied`, `dry_run` |
+| `scene save` | проверена (`scene.save`): сохраняет открытую сцену, путь в `files` |
+| `scene open` | проверена (`scene.open`, args: `path`): открывает существующую сцену в редакторе |
+| `scene undo` / `scene redo` | проверены (`scene.undo`, `scene.redo`): отмена/повтор последнего действия в истории открытой сцены, как Ctrl+Z / Ctrl+Y; в ответе имя действия |
+| `scene new` | проверена (`scene.new`, args: `path`, `root_type`=Node3D, `root_name`): создаёт сцену с одним корнем, сохраняет и открывает в редакторе |
 | `script set` | не реализована |
 | `game run / stop` | не реализована |
 | `log get` | не реализована |
 | `screenshot` | не реализована |
+
+## Значения свойств в `scene apply`
+
+- Числа, строки, `true`/`false` — как есть.
+- Список из 3 чисел → Vector3 (`position`, `rotation_degrees`, `scale`), из 2 чисел → Vector2.
+- Цвет: `"#rrggbb"` или список из 3–4 чисел от 0 до 1.
+- `"res://путь"` → загружается ресурс (меш, материал, сцена).
+- `mesh`: `{"primitive": "box"|"plane"|"sphere"|"cylinder"|"capsule", "size": [...], "radius": r, "height": h, "color": ...}`.
+- `material_override`: `{"color": ...}` → StandardMaterial3D.
+
+Пример набора операций: `tools/enginectl/examples/yard.json` (пол, две стены, свет).
