@@ -5,7 +5,7 @@ extends EditorPlugin
 ## Запрос: {"token": "...", "command": "doctor", "args": {}}
 ## Ответ:  {"status": "ok"|"error", "result": {...}, "errors": [], "warnings": [], "files": []}
 
-const PLUGIN_VERSION := "0.2.0"
+const PLUGIN_VERSION := "0.3.0"
 const HOST := "127.0.0.1"
 const DEFAULT_PORT := 47615
 const PORT_TRIES := 10
@@ -156,8 +156,427 @@ func _handle_line(line: String) -> Dictionary:
 			return _ok(_doctor())
 		"scene.inspect":
 			return _scene_inspect(args)
+		"scene.apply":
+			return _scene_apply(args)
+		"scene.save":
+			return _scene_save()
+		"scene.new":
+			return _scene_new(args)
+		"scene.open":
+			return _scene_open(args)
+		"scene.undo":
+			return _scene_undo(true)
+		"scene.redo":
+			return _scene_undo(false)
 		var unknown:
 			return _error("Неизвестная команда: %s" % unknown)
+
+
+# ---------------------------------------------------------------------------
+# scene.apply: набор изменений сцены через Undo/Redo редактора.
+# args.ops — список операций, args.dry_run — только показать план.
+# Операции:
+#   {"op": "create", "parent": ".", "name": "Cube", "type": "MeshInstance3D", "props": {...}}
+#   {"op": "set", "path": "Cube", "props": {"position": [1, 0.5, 0]}}
+#   {"op": "delete", "path": "Cube"}
+# Значения свойств: числа, строки, bool, массивы из 2/3/4 чисел (Vector2/Vector3/Color),
+# "res://..." для ресурсов, для mesh — {"primitive": "box"|"plane"|"sphere"|"cylinder"|"capsule", ...},
+# для material — {"color": [r, g, b]} или {"color": "#rrggbb"}.
+# Сначала проверяются все операции; если хоть одна неверна, не применяется ничего.
+# ---------------------------------------------------------------------------
+
+const UNDO_LABEL := "AI Bridge: scene apply"
+
+
+func _scene_apply(args: Dictionary) -> Dictionary:
+	var root := EditorInterface.get_edited_scene_root()
+	if root == null:
+		return _error("В редакторе не открыта ни одна сцена")
+	var ops = args.get("ops", [])
+	if typeof(ops) != TYPE_ARRAY or ops.is_empty():
+		return _error("Поле ops должно быть непустым списком операций")
+	var dry_run := bool(args.get("dry_run", false))
+
+	# Этап 1: проверка и построение плана. created: путь -> ещё не добавленный узел.
+	var plan: Array = []
+	var errors: Array = []
+	var steps: Array = []  # что именно делать при применении
+	var created: Dictionary = {}
+	var deleted: Dictionary = {}
+	for i in ops.size():
+		var op = ops[i]
+		if typeof(op) != TYPE_DICTIONARY:
+			errors.append("Операция %d: должна быть объектом" % i)
+			continue
+		var kind := str(op.get("op", ""))
+		match kind:
+			"create":
+				_plan_create(i, op, root, created, deleted, plan, steps, errors)
+			"set":
+				_plan_set(i, op, root, created, deleted, plan, steps, errors)
+			"delete":
+				_plan_delete(i, op, root, created, deleted, plan, steps, errors)
+			_:
+				errors.append("Операция %d: неизвестный тип «%s» (ожидается create, set или delete)" % [i, kind])
+	if not errors.is_empty():
+		# Узлы, созданные для плана, но не добавленные в сцену, освобождаем.
+		for node in created.values():
+			node.free()
+		var response := _error("План не применён: найдены ошибки")
+		response["errors"] = errors
+		response["result"] = {"plan": plan, "dry_run": dry_run, "applied": false}
+		return response
+	if dry_run:
+		for node in created.values():
+			node.free()
+		return _ok({"plan": plan, "dry_run": true, "applied": false, "scene_path": root.scene_file_path})
+
+	# Этап 2: применение одним действием Undo/Redo.
+	var ur := get_undo_redo()
+	ur.create_action("%s (%d)" % [UNDO_LABEL, steps.size()], UndoRedo.MERGE_DISABLE, root)
+	for step in steps:
+		match step["kind"]:
+			"create":
+				ur.add_do_method(step["parent"], "add_child", step["node"])
+				ur.add_do_method(step["node"], "set_owner", root)
+				ur.add_do_reference(step["node"])
+				ur.add_undo_method(step["parent"], "remove_child", step["node"])
+			"set":
+				ur.add_do_property(step["node"], step["prop"], step["value"])
+				ur.add_undo_property(step["node"], step["prop"], step["old"])
+			"delete":
+				ur.add_do_method(step["parent"], "remove_child", step["node"])
+				ur.add_undo_method(step["parent"], "add_child", step["node"])
+				ur.add_undo_method(step["parent"], "move_child", step["node"], step["index"])
+				ur.add_undo_method(self, "_set_owner_many", step["owned"], root)
+				ur.add_undo_reference(step["node"])
+	ur.commit_action()
+	EditorInterface.mark_scene_as_unsaved()
+	return _ok({"plan": plan, "dry_run": false, "applied": true, "scene_path": root.scene_file_path,
+		"undo_hint": "Отменить: Ctrl+Z в редакторе"})
+
+
+func _plan_create(i: int, op: Dictionary, root: Node, created: Dictionary, deleted: Dictionary,
+		plan: Array, steps: Array, errors: Array) -> void:
+	var type := str(op.get("type", ""))
+	var name := str(op.get("name", ""))
+	var parent_path := str(op.get("parent", "."))
+	if name == "" or name.validate_node_name() != name:
+		errors.append("Операция %d: имя узла «%s» пустое или содержит недопустимые символы" % [i, name])
+		return
+	if not ClassDB.class_exists(type) or not ClassDB.can_instantiate(type) or not ClassDB.is_parent_class(type, "Node"):
+		errors.append("Операция %d: тип «%s» не существует или это не узел" % [i, type])
+		return
+	var parent := _resolve(root, parent_path, created, deleted)
+	if parent == null:
+		errors.append("Операция %d: родитель «%s» не найден" % [i, parent_path])
+		return
+	var new_path := _join_path(root, parent, name, created)
+	if parent.has_node(name) or created.has(new_path):
+		errors.append("Операция %d: у «%s» уже есть дочерний узел «%s»" % [i, parent_path, name])
+		return
+	var node: Node = ClassDB.instantiate(type)
+	node.name = name
+	created[new_path] = node
+	steps.append({"kind": "create", "parent": parent, "node": node})
+	var entry := {"op": "create", "path": new_path, "type": type, "props": {}}
+	var props = op.get("props", {})
+	if typeof(props) != TYPE_DICTIONARY:
+		errors.append("Операция %d: props должно быть объектом" % i)
+		return
+	for prop in props:
+		var converted := _coerce(node, str(prop), props[prop])
+		if converted.has("error"):
+			errors.append("Операция %d: %s" % [i, converted["error"]])
+			continue
+		node.set(str(prop), converted["value"])
+		entry["props"][str(prop)] = _to_json(converted["value"])
+	plan.append(entry)
+
+
+func _plan_set(i: int, op: Dictionary, root: Node, created: Dictionary, deleted: Dictionary,
+		plan: Array, steps: Array, errors: Array) -> void:
+	var path := str(op.get("path", ""))
+	var node := _resolve(root, path, created, deleted)
+	if node == null:
+		errors.append("Операция %d: узел «%s» не найден" % [i, path])
+		return
+	var props = op.get("props", {})
+	if typeof(props) != TYPE_DICTIONARY or props.is_empty():
+		errors.append("Операция %d: props должно быть непустым объектом" % i)
+		return
+	var entry := {"op": "set", "path": path, "changes": {}}
+	for prop in props:
+		var converted := _coerce(node, str(prop), props[prop])
+		if converted.has("error"):
+			errors.append("Операция %d: %s" % [i, converted["error"]])
+			continue
+		var old = node.get(str(prop))
+		if created.values().has(node):
+			node.set(str(prop), converted["value"])  # узел ещё не в сцене, менять можно напрямую
+		else:
+			steps.append({"kind": "set", "node": node, "prop": str(prop), "value": converted["value"], "old": old})
+		entry["changes"][str(prop)] = {"from": _to_json(old), "to": _to_json(converted["value"])}
+	plan.append(entry)
+
+
+func _plan_delete(i: int, op: Dictionary, root: Node, created: Dictionary, deleted: Dictionary,
+		plan: Array, steps: Array, errors: Array) -> void:
+	var path := str(op.get("path", ""))
+	var node := _resolve(root, path, created, deleted)
+	if node == null:
+		errors.append("Операция %d: узел «%s» не найден" % [i, path])
+		return
+	if node == root:
+		errors.append("Операция %d: корень сцены удалить нельзя" % i)
+		return
+	if created.values().has(node):
+		errors.append("Операция %d: узел «%s» создаётся в этом же наборе, уберите его создание" % [i, path])
+		return
+	deleted[path] = true
+	var owned := _collect_owned(node, root)
+	steps.append({"kind": "delete", "parent": node.get_parent(), "node": node,
+		"index": node.get_index(), "owned": owned})
+	plan.append({"op": "delete", "path": path, "type": node.get_class(), "descendants": owned.size() - 1})
+
+
+## Ищет узел по пути от корня: сначала в сцене, затем среди только что созданных.
+func _resolve(root: Node, path: String, created: Dictionary, deleted: Dictionary) -> Node:
+	if path == "" or path == ".":
+		return root
+	if deleted.has(path):
+		return null
+	if created.has(path):
+		return created[path]
+	return root.get_node_or_null(path)
+
+
+func _join_path(root: Node, parent: Node, name: String, created: Dictionary) -> String:
+	if parent == root:
+		return name
+	for key in created:
+		if created[key] == parent:
+			return key + "/" + name
+	return str(root.get_path_to(parent)) + "/" + name
+
+
+func _collect_owned(node: Node, root: Node) -> Array:
+	var result: Array = [node]
+	for child in node.get_children():
+		if child.owner == root:
+			result.append_array(_collect_owned(child, root))
+	return result
+
+
+func _set_owner_many(nodes: Array, root: Node) -> void:
+	for node in nodes:
+		node.owner = root
+
+
+## Переводит значение из JSON в тип свойства узла. Возвращает {"value": ...} или {"error": "..."}.
+func _coerce(node: Node, prop: String, value: Variant) -> Dictionary:
+	if not _has_property(node, prop):
+		return {"error": "у %s нет свойства «%s»" % [node.get_class(), prop]}
+	if prop == "mesh" and typeof(value) == TYPE_DICTIONARY:
+		return _make_mesh(value)
+	if prop == "material_override" or prop == "material":
+		if typeof(value) == TYPE_DICTIONARY:
+			return _make_material(value)
+	if typeof(value) == TYPE_STRING and str(value).begins_with("res://"):
+		var res := load(str(value))
+		if res == null:
+			return {"error": "ресурс «%s» не найден" % value}
+		return {"value": res}
+	var current = node.get(prop)
+	match typeof(current):
+		TYPE_VECTOR3:
+			if _is_number_array(value, 3):
+				return {"value": Vector3(value[0], value[1], value[2])}
+			return {"error": "«%s» ожидает список из 3 чисел" % prop}
+		TYPE_VECTOR2:
+			if _is_number_array(value, 2):
+				return {"value": Vector2(value[0], value[1])}
+			return {"error": "«%s» ожидает список из 2 чисел" % prop}
+		TYPE_COLOR:
+			var color := _to_color(value)
+			if color.has("error"):
+				return {"error": "«%s»: %s" % [prop, color["error"]]}
+			return color
+		TYPE_INT:
+			if typeof(value) == TYPE_FLOAT or typeof(value) == TYPE_INT:
+				return {"value": int(value)}
+			return {"error": "«%s» ожидает число" % prop}
+		TYPE_FLOAT:
+			if typeof(value) == TYPE_FLOAT or typeof(value) == TYPE_INT:
+				return {"value": float(value)}
+			return {"error": "«%s» ожидает число" % prop}
+		TYPE_BOOL:
+			if typeof(value) == TYPE_BOOL:
+				return {"value": value}
+			return {"error": "«%s» ожидает true или false" % prop}
+		TYPE_STRING, TYPE_STRING_NAME:
+			return {"value": str(value)}
+		TYPE_NODE_PATH:
+			return {"value": NodePath(str(value))}
+		_:
+			return {"value": value}
+
+
+func _has_property(node: Node, prop: String) -> bool:
+	for p in node.get_property_list():
+		if p.name == prop:
+			return true
+	return false
+
+
+func _is_number_array(value: Variant, size: int) -> bool:
+	if typeof(value) != TYPE_ARRAY or value.size() != size:
+		return false
+	for v in value:
+		if typeof(v) != TYPE_FLOAT and typeof(v) != TYPE_INT:
+			return false
+	return true
+
+
+func _to_color(value: Variant) -> Dictionary:
+	if typeof(value) == TYPE_STRING and Color.html_is_valid(str(value)):
+		return {"value": Color.html(str(value))}
+	if _is_number_array(value, 3):
+		return {"value": Color(value[0], value[1], value[2])}
+	if _is_number_array(value, 4):
+		return {"value": Color(value[0], value[1], value[2], value[3])}
+	return {"error": "цвет задаётся как \"#rrggbb\" или список из 3–4 чисел от 0 до 1"}
+
+
+func _make_mesh(spec: Dictionary) -> Dictionary:
+	var primitive := str(spec.get("primitive", "box"))
+	var mesh: PrimitiveMesh
+	match primitive:
+		"box":
+			var box := BoxMesh.new()
+			if spec.has("size"):
+				if not _is_number_array(spec["size"], 3):
+					return {"error": "size для box: список из 3 чисел"}
+				box.size = Vector3(spec["size"][0], spec["size"][1], spec["size"][2])
+			mesh = box
+		"plane":
+			var plane := PlaneMesh.new()
+			if spec.has("size"):
+				if not _is_number_array(spec["size"], 2):
+					return {"error": "size для plane: список из 2 чисел"}
+				plane.size = Vector2(spec["size"][0], spec["size"][1])
+			mesh = plane
+		"sphere":
+			var sphere := SphereMesh.new()
+			if spec.has("radius"):
+				sphere.radius = float(spec["radius"])
+				sphere.height = float(spec.get("height", sphere.radius * 2.0))
+			mesh = sphere
+		"cylinder":
+			var cylinder := CylinderMesh.new()
+			if spec.has("radius"):
+				cylinder.top_radius = float(spec["radius"])
+				cylinder.bottom_radius = float(spec["radius"])
+			if spec.has("height"):
+				cylinder.height = float(spec["height"])
+			mesh = cylinder
+		"capsule":
+			var capsule := CapsuleMesh.new()
+			if spec.has("radius"):
+				capsule.radius = float(spec["radius"])
+			if spec.has("height"):
+				capsule.height = float(spec["height"])
+			mesh = capsule
+		_:
+			return {"error": "неизвестный примитив «%s» (box, plane, sphere, cylinder, capsule)" % primitive}
+	if spec.has("color"):
+		var color := _to_color(spec["color"])
+		if color.has("error"):
+			return color
+		var material := StandardMaterial3D.new()
+		material.albedo_color = color["value"]
+		mesh.material = material
+	return {"value": mesh}
+
+
+func _make_material(spec: Dictionary) -> Dictionary:
+	var material := StandardMaterial3D.new()
+	if spec.has("color"):
+		var color := _to_color(spec["color"])
+		if color.has("error"):
+			return color
+		material.albedo_color = color["value"]
+	return {"value": material}
+
+
+## Значение свойства в виде, пригодном для JSON.
+func _to_json(value: Variant) -> Variant:
+	match typeof(value):
+		TYPE_VECTOR3:
+			return _v3(value)
+		TYPE_VECTOR2:
+			return _v2(value)
+		TYPE_COLOR:
+			return [snappedf(value.r, 0.001), snappedf(value.g, 0.001), snappedf(value.b, 0.001), snappedf(value.a, 0.001)]
+		TYPE_NODE_PATH, TYPE_STRING_NAME:
+			return str(value)
+		TYPE_OBJECT:
+			if value == null:
+				return null
+			if value is Resource and value.resource_path != "":
+				return value.resource_path
+			return value.get_class()
+		TYPE_NIL, TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_ARRAY, TYPE_DICTIONARY:
+			return value
+		_:
+			return str(value)
+
+
+# ---------------------------------------------------------------------------
+# scene.save и scene.new
+# ---------------------------------------------------------------------------
+
+func _scene_save() -> Dictionary:
+	var root := EditorInterface.get_edited_scene_root()
+	if root == null:
+		return _error("В редакторе не открыта ни одна сцена")
+	if root.scene_file_path == "":
+		return _error("Сцена ещё не сохранялась и не имеет пути; создайте её через scene.new")
+	var err := EditorInterface.save_scene()
+	if err != OK:
+		return _error("Не удалось сохранить сцену: %s" % error_string(err))
+	var response := _ok({"scene_path": root.scene_file_path})
+	response["files"] = [root.scene_file_path]
+	return response
+
+
+## Создаёт новую сцену с одним корневым узлом, сохраняет и открывает её в редакторе.
+## args: path ("res://scenes/x.tscn"), root_type (по умолчанию Node3D), root_name (по умолчанию имя файла).
+func _scene_new(args: Dictionary) -> Dictionary:
+	var path := str(args.get("path", ""))
+	if not path.begins_with("res://") or not path.ends_with(".tscn") or path.contains(".."):
+		return _error("path должен быть вида res://папка/имя.tscn")
+	if FileAccess.file_exists(path):
+		return _error("Файл «%s» уже существует" % path)
+	var root_type := str(args.get("root_type", "Node3D"))
+	if not ClassDB.class_exists(root_type) or not ClassDB.can_instantiate(root_type) or not ClassDB.is_parent_class(root_type, "Node"):
+		return _error("root_type «%s» не существует или это не узел" % root_type)
+	var root: Node = ClassDB.instantiate(root_type)
+	root.name = str(args.get("root_name", path.get_file().get_basename().to_pascal_case()))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
+	var packed := PackedScene.new()
+	var err := packed.pack(root)
+	root.free()
+	if err != OK:
+		return _error("Не удалось собрать сцену: %s" % error_string(err))
+	err = ResourceSaver.save(packed, path)
+	if err != OK:
+		return _error("Не удалось сохранить «%s»: %s" % [path, error_string(err)])
+	EditorInterface.get_resource_filesystem().scan()
+	EditorInterface.open_scene_from_path(path)
+	var response := _ok({"scene_path": path, "root_type": root_type})
+	response["files"] = [path]
+	return response
 
 
 ## Дерево открытой в редакторе сцены. args: path (узел, с которого начать, по умолчанию корень),
@@ -263,3 +682,35 @@ func _write_connection_file() -> void:
 		push_error("AI Bridge: не удалось записать файл подключения")
 		return
 	file.store_string(JSON.stringify({"host": HOST, "port": _port, "token": _token, "pid": OS.get_process_id()}, "\t"))
+
+
+## Отмена или повтор последнего действия в истории открытой сцены (то же, что Ctrl+Z / Ctrl+Y).
+func _scene_undo(undo: bool) -> Dictionary:
+	var root := EditorInterface.get_edited_scene_root()
+	if root == null:
+		return _error("В редакторе не открыта ни одна сцена")
+	var ur := get_undo_redo()
+	var history := ur.get_history_undo_redo(ur.get_object_history_id(root))
+	if undo:
+		if not history.has_undo():
+			return _error("Нечего отменять")
+		var action := history.get_current_action_name()
+		history.undo()
+		EditorInterface.mark_scene_as_unsaved()
+		return _ok({"undone": action})
+	if not history.has_redo():
+		return _error("Нечего повторять")
+	history.redo()
+	EditorInterface.mark_scene_as_unsaved()
+	return _ok({"redone": history.get_current_action_name()})
+
+
+## Открывает существующую сцену в редакторе.
+func _scene_open(args: Dictionary) -> Dictionary:
+	var path := str(args.get("path", ""))
+	if not path.begins_with("res://") or path.contains(".."):
+		return _error("path должен начинаться с res://")
+	if not FileAccess.file_exists(path):
+		return _error("Файл «%s» не найден" % path)
+	EditorInterface.open_scene_from_path(path)
+	return _ok({"scene_path": path})
