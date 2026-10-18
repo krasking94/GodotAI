@@ -28,6 +28,7 @@
 3. В ответе должно быть `"status": "ok"` и «Godot на связи».
 4. Открыть в редакторе сцену `scenes/inspect_test.tscn` и выполнить `python tools\enginectl\enginectl.py scene inspect`: в ответе дерево узлов Root → Floor, Cube, Sun, Camera.
 5. `python tools\enginectl\enginectl.py scene apply --file tools\enginectl\examples\yard.json --dry-run` покажет план, та же команда без `--dry-run` поставит в сцену пол, две стены и свет; Ctrl+Z в редакторе убирает всё разом.
+6. `python tools\enginectl\enginectl.py game run --seconds 5` запускает главную сцену (двор) на 5 секунд и возвращает ошибки и вывод игры; `python tools\enginectl\enginectl.py log get` показывает лог последнего запуска.
 
 Самопроверка без терминала: `Godot --headless --path <папка проекта> --editor -- --ai-bridge-selftest`
 печатает ответы на верный и неверный токен и строку `AI Bridge selftest: PASS`.

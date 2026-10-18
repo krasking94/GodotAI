@@ -25,10 +25,11 @@
 | `scene open` | проверена (`scene.open`, args: `path`): открывает существующую сцену в редакторе |
 | `scene undo` / `scene redo` | проверены (`scene.undo`, `scene.redo`): отмена/повтор последнего действия в истории открытой сцены, как Ctrl+Z / Ctrl+Y; в ответе имя действия |
 | `scene new` | проверена (`scene.new`, args: `path`, `root_type`=Node3D, `root_name`): создаёт сцену с одним корнем, сохраняет и открывает в редакторе |
-| `script set` | не реализована |
-| `game run / stop` | не реализована |
-| `log get` | не реализована |
+| `script set` | проверена (`script.set`, args: `path`, `content`, `node` необязательно): записывает .gd, обновляет его в редакторе, при `node` вешает на узел через Undo/Redo. Если скрипт не компилируется, в ответе `parse_error` и предупреждение |
+| `game run / stop / status` | проверены. Реализованы в enginectl, не в плагине: игра запускается отдельным процессом Godot (путь берётся из connection.json открытого редактора, из `--godot` или `GODOT_EXE`; на Windows автоматически берётся `_console.exe`), вывод пишется в `.godot/ai_bridge/last_run.log`. `run` ждёт `--seconds` (по умолчанию 8) и останавливает игру, либо `--background`; `--scene` выбирает сцену, иначе главная; `--headless` без окна |
+| `log get` | проверена: разбирает лог последнего запуска на `errors` (SCRIPT ERROR / ERROR / USER ERROR с подробностями `at:`), `warnings` и `output` |
 | `screenshot` | не реализована |
+| `project main-scene` | проверена (`project.main_scene`, args: `path`): назначает главную сцену, сохраняет project.godot |
 
 ## Значения свойств в `scene apply`
 

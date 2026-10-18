@@ -18,4 +18,6 @@
 
 **Как проверять без владельца:** скачать Godot Linux в среду, `Godot --headless --path <проект> --editor` в фоне, затем `python3 tools/enginectl/enginectl.py ...`. Проверка синтаксиса: `--headless --check-only --script res://addons/ai_bridge/plugin.gd`.
 
-**Следующий шаг:** день 6 плана — `game run / stop` и `log get` (запуск игры из редактора и чтение ошибок).
+**День 6 (ветка game-run, PR #4):** `script set`, `project main-scene`, `game run/stop/status`, `log get`. Игра запускается не из редактора, а отдельным процессом Godot (так весь вывод попадает в лог; путь к Godot берётся из connection.json). Цикл «сломанный скрипт → game run → log get → исправление → чистый запуск» проверен headless. Создана сцена `scenes/yard.tscn` (двор: пол, две стены, лампа, камера, скрипт `game/yard.gd`), назначена главной.
+
+**Следующий шаг:** день 7 (оформить «двор одной фразой», проверить, что сцена открывается заново) и неделя 2: персонаж (дни 8–9).
