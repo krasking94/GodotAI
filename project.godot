@@ -6,3 +6,7 @@ config_version=5
 
 config/name="GodotAI"
 config/features=PackedStringArray("4.7")
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/ai_bridge/plugin.cfg")
