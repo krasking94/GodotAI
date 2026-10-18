@@ -5,7 +5,7 @@ extends EditorPlugin
 ## Запрос: {"token": "...", "command": "doctor", "args": {}}
 ## Ответ:  {"status": "ok"|"error", "result": {...}, "errors": [], "warnings": [], "files": []}
 
-const PLUGIN_VERSION := "0.1.0"
+const PLUGIN_VERSION := "0.2.0"
 const HOST := "127.0.0.1"
 const DEFAULT_PORT := 47615
 const PORT_TRIES := 10
@@ -154,8 +154,71 @@ func _handle_line(line: String) -> Dictionary:
 	match str(request.get("command", "")):
 		"doctor":
 			return _ok(_doctor())
+		"scene.inspect":
+			return _scene_inspect(args)
 		var unknown:
 			return _error("Неизвестная команда: %s" % unknown)
+
+
+## Дерево открытой в редакторе сцены. args: path (узел, с которого начать, по умолчанию корень),
+## depth (сколько уровней вниз, -1 = все).
+func _scene_inspect(args: Dictionary) -> Dictionary:
+	var root := EditorInterface.get_edited_scene_root()
+	if root == null:
+		return _error("В редакторе не открыта ни одна сцена")
+	var start: Node = root
+	var start_path := str(args.get("path", "."))
+	if start_path != "" and start_path != ".":
+		start = root.get_node_or_null(start_path)
+		if start == null:
+			return _error("Узел не найден: %s" % start_path)
+	var max_depth := int(args.get("depth", -1))
+	var counter := [0]
+	var tree := _describe_node(start, root, max_depth, 0, counter)
+	return _ok({
+		"scene_path": root.scene_file_path,
+		"root": tree,
+		"node_count": counter[0],
+	})
+
+
+func _describe_node(node: Node, root: Node, max_depth: int, depth: int, counter: Array) -> Dictionary:
+	counter[0] += 1
+	var info := {
+		"name": str(node.name),
+		"type": node.get_class(),
+		"path": str(root.get_path_to(node)),
+	}
+	var script = node.get_script()
+	if script is Script:
+		info["script"] = script.resource_path
+	if node != root and node.scene_file_path != "":
+		info["instance"] = node.scene_file_path
+	if node is Node3D:
+		info["position"] = _v3(node.position)
+		info["rotation_degrees"] = _v3(node.rotation_degrees)
+		info["scale"] = _v3(node.scale)
+	elif node is Node2D:
+		info["position"] = _v2(node.position)
+		info["rotation_degrees"] = snappedf(node.rotation_degrees, 0.001)
+		info["scale"] = _v2(node.scale)
+	elif node is Control:
+		info["position"] = _v2(node.position)
+		info["size"] = _v2(node.size)
+	var children := []
+	if max_depth < 0 or depth < max_depth:
+		for child in node.get_children():
+			children.append(_describe_node(child, root, max_depth, depth + 1, counter))
+	info["children"] = children
+	return info
+
+
+func _v3(v: Vector3) -> Array:
+	return [snappedf(v.x, 0.001), snappedf(v.y, 0.001), snappedf(v.z, 0.001)]
+
+
+func _v2(v: Vector2) -> Array:
+	return [snappedf(v.x, 0.001), snappedf(v.y, 0.001)]
 
 
 func _doctor() -> Dictionary:
