@@ -30,7 +30,8 @@
 5. `python tools\enginectl\enginectl.py scene apply --file tools\enginectl\examples\yard.json --dry-run` покажет план, та же команда без `--dry-run` поставит в сцену пол, две стены, свет и персонажа; Ctrl+Z в редакторе убирает всё разом. (Сам двор `scenes/yard.tscn` собран из этого же описания командой `scene build --overwrite`.)
 6. `python tools\enginectl\enginectl.py game run --seconds 5` запускает главную сцену (двор) на 5 секунд и возвращает ошибки и вывод игры; `python tools\enginectl\enginectl.py log get` показывает лог последнего запуска.
 7. Кнопка **▶ Запустить** (F5) открывает двор с персонажем: W A S D или стрелки — ходьба, Shift — бег, мышь — обзор, пробел — прыжок, Esc отпускает мышь (щелчок по окну захватывает снова). В выводе через секунду строка «Персонаж: на полу=true, …».
-8. `python tools\enginectl\enginectl.py scene build --file tools\enginectl\examples\room.json` создаёт новую сцену `scenes/room.tscn` целиком (пол, четыре стены, лампа, камера, скрипт), сохраняет её и открывает в редакторе. `python tools\enginectl\enginectl.py game run --scene res://scenes/room.tscn --seconds 5` запускает комнату, в выводе «Комната готова: 7 объектов».
+8. `python tools\enginectl\enginectl.py game run --scene res://scenes/car_test.tscn --seconds 60` открывает площадку с машиной: первые 2 секунды она едет сама (в выводе «Машина: проехала … м»), дальше W/S газ и задний ход, A/D руль, пробел тормоз. Через 60 секунд окно закроется само.
+9. `python tools\enginectl\enginectl.py scene build --file tools\enginectl\examples\room.json` создаёт новую сцену `scenes/room.tscn` целиком (пол, четыре стены, лампа, камера, скрипт), сохраняет её и открывает в редакторе. `python tools\enginectl\enginectl.py game run --scene res://scenes/room.tscn --seconds 5` запускает комнату, в выводе «Комната готова: 7 объектов».
 
 ## Как работает «одной фразой»
 
