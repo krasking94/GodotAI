@@ -29,6 +29,11 @@
 4. Открыть в редакторе сцену `scenes/inspect_test.tscn` и выполнить `python tools\enginectl\enginectl.py scene inspect`: в ответе дерево узлов Root → Floor, Cube, Sun, Camera.
 5. `python tools\enginectl\enginectl.py scene apply --file tools\enginectl\examples\yard.json --dry-run` покажет план, та же команда без `--dry-run` поставит в сцену пол, две стены и свет; Ctrl+Z в редакторе убирает всё разом.
 6. `python tools\enginectl\enginectl.py game run --seconds 5` запускает главную сцену (двор) на 5 секунд и возвращает ошибки и вывод игры; `python tools\enginectl\enginectl.py log get` показывает лог последнего запуска.
+7. `python tools\enginectl\enginectl.py scene build --file tools\enginectl\examples\room.json` создаёт новую сцену `scenes/room.tscn` целиком (пол, четыре стены, лампа, камера, скрипт), сохраняет её и открывает в редакторе. `python tools\enginectl\enginectl.py game run --scene res://scenes/room.tscn --seconds 5` запускает комнату, в выводе «Комната готова: 7 объектов».
+
+## Как работает «одной фразой»
+
+Человек пишет фразу («сделай комнату: пол, четыре стены, лампа и камера»). ИИ переводит её в JSON-описание сцены (как в `tools/enginectl/examples/room.json`, там же записана и сама фраза) и выполняет одну команду `scene build`. Редактор собирает сцену, сохраняет файл, перечитывает его с диска для проверки и открывает. Если в описании ошибка, файл не создаётся, а ИИ получает список ошибок и исправляет описание. ИИ не пишет файлы `.tscn` руками: это делает редактор, поэтому сцена всегда корректная.
 
 Самопроверка без терминала: `Godot --headless --path <папка проекта> --editor -- --ai-bridge-selftest`
 печатает ответы на верный и неверный токен и строку `AI Bridge selftest: PASS`.

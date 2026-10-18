@@ -1,0 +1,86 @@
+{
+  "phrase": "Сделай комнату: деревянный пол 8 на 8, четыре светлые стены, лампа сверху и камера, чтобы было видно всю комнату",
+  "scene": {
+    "path": "res://scenes/room.tscn",
+    "root_type": "Node3D",
+    "root_name": "Room"
+  },
+  "ops": [
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Floor",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {"primitive": "plane", "size": [8, 8], "color": "#a0865a"}
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "WallNorth",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {"primitive": "box", "size": [8, 2.5, 0.2], "color": "#d9d2c5"},
+        "position": [0, 1.25, -4]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "WallSouth",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {"primitive": "box", "size": [8, 2.5, 0.2], "color": "#d9d2c5"},
+        "position": [0, 1.25, 4]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "WallEast",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {"primitive": "box", "size": [0.2, 2.5, 8], "color": "#d9d2c5"},
+        "position": [4, 1.25, 0]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "WallWest",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {"primitive": "box", "size": [0.2, 2.5, 8], "color": "#d9d2c5"},
+        "position": [-4, 1.25, 0]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Lamp",
+      "type": "DirectionalLight3D",
+      "props": {
+        "position": [0, 4, 0],
+        "rotation_degrees": [-60, 20, 0]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Camera",
+      "type": "Camera3D",
+      "props": {
+        "position": [0, 7, 10],
+        "rotation_degrees": [-35, 0, 0]
+      }
+    },
+    {
+      "op": "set",
+      "path": ".",
+      "props": {
+        "script": "res://game/room.gd"
+      }
+    }
+  ]
+}

@@ -1,4 +1,10 @@
 {
+  "phrase": "Сделай двор: пол, две стены и свет",
+  "scene": {
+    "path": "res://scenes/yard.tscn",
+    "root_type": "Node3D",
+    "root_name": "Yard"
+  },
   "ops": [
     {
       "op": "create",
