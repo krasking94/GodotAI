@@ -5,7 +5,7 @@ extends EditorPlugin
 ## Запрос: {"token": "...", "command": "doctor", "args": {}}
 ## Ответ:  {"status": "ok"|"error", "result": {...}, "errors": [], "warnings": [], "files": []}
 
-const PLUGIN_VERSION := "0.6.0"
+const PLUGIN_VERSION := "0.7.0"
 const HOST := "127.0.0.1"
 const DEFAULT_PORT := 47615
 const PORT_TRIES := 10
@@ -387,6 +387,8 @@ func _coerce(node: Node, prop: String, value: Variant) -> Dictionary:
 		return _make_mesh(value)
 	if prop == "shape" and typeof(value) == TYPE_DICTIONARY:
 		return _make_shape(value)
+	if prop == "environment" and typeof(value) == TYPE_DICTIONARY:
+		return _make_environment(value)
 	if prop == "material_override" or prop == "material":
 		if typeof(value) == TYPE_DICTIONARY:
 			return _make_material(value)
@@ -541,6 +543,36 @@ func _make_shape(spec: Dictionary) -> Dictionary:
 			return {"error": "неизвестная форма «%s» (box, sphere, capsule, cylinder)" % primitive}
 
 
+## Окружение для WorldEnvironment: {"sky": true, "ambient_energy": 0.0..1.0, "sky_color": цвет, "horizon_color": цвет, "fog": true}.
+## С небом теневые стороны объектов подсвечиваются рассеянным светом, а фон становится небом.
+func _make_environment(spec: Dictionary) -> Dictionary:
+	var env := Environment.new()
+	if bool(spec.get("sky", true)):
+		var material := ProceduralSkyMaterial.new()
+		for key in ["sky_color", "horizon_color", "ground_color"]:
+			if spec.has(key):
+				var color := _to_color(spec[key])
+				if color.has("error"):
+					return {"error": "%s: %s" % [key, color["error"]]}
+				if key == "sky_color":
+					material.sky_top_color = color["value"]
+				elif key == "horizon_color":
+					material.sky_horizon_color = color["value"]
+					material.ground_horizon_color = color["value"]
+				else:
+					material.ground_bottom_color = color["value"]
+		var sky := Sky.new()
+		sky.sky_material = material
+		env.background_mode = Environment.BG_SKY
+		env.sky = sky
+		env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	if spec.has("ambient_energy"):
+		env.ambient_light_energy = float(spec["ambient_energy"])
+	if bool(spec.get("fog", false)):
+		env.fog_enabled = true
+	return {"value": env}
+
+
 func _make_material(spec: Dictionary) -> Dictionary:
 	var material := StandardMaterial3D.new()
 	if spec.has("color"):
@@ -571,6 +603,9 @@ func _to_json(value: Variant) -> Variant:
 				return _describe_mesh(value)
 			if value is Shape3D:
 				return _describe_shape(value)
+			if value is Environment:
+				return {"environment": "Environment", "sky": value.sky != null,
+					"ambient_energy": value.ambient_light_energy, "fog": value.fog_enabled}
 			if value is StandardMaterial3D:
 				return {"material": "StandardMaterial3D", "color": _to_json(value.albedo_color)}
 			return value.get_class()
