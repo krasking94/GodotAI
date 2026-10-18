@@ -37,7 +37,7 @@
 - Числа, строки, `true`/`false` — как есть.
 - Список из 3 чисел → Vector3 (`position`, `rotation_degrees`, `scale`), из 2 чисел → Vector2.
 - Цвет: `"#rrggbb"` или список из 3–4 чисел от 0 до 1.
-- `"res://путь"` → загружается ресурс (меш, материал, сцена).
+- `"res://путь"` → загружается ресурс (меш, материал, сцена). Для скрипта текст сверяется с диском и при расхождении перезагружается: редактор без фокуса не замечает правок, сделанных снаружи, и иначе отдаёт из кэша старую версию без новых `@export`-свойств (ошибка вида «у CharacterBody3D нет свойства …»).
 - `mesh`: `{"primitive": "box"|"plane"|"sphere"|"cylinder"|"capsule", "size": [...], "radius": r, "height": h, "color": ...}`. Вместо `color` можно задать `"shader": "res://game/grid.gdshader", "params": {...}` → ShaderMaterial (цвета в `params` как `"#rrggbb"`, списки чисел → Vector2/Vector3); `game/grid.gdshader` рисует клетчатую разметку по мировым координатам (плагин 0.8.0).
 - `material_override`: `{"color": ...}` → StandardMaterial3D, либо `{"shader": ..., "params": {...}}` → ShaderMaterial.
 - `shape` (у CollisionShape3D): `{"primitive": "box"|"sphere"|"capsule"|"cylinder", "size": [x, y, z], "radius": r, "height": h}` → BoxShape3D, SphereShape3D, CapsuleShape3D, CylinderShape3D.
