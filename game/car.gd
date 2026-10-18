@@ -2,7 +2,8 @@ extends VehicleBody3D
 
 ## Машина на упрощённой физике Godot (VehicleBody3D: кузов + четыре VehicleWheel3D).
 ## Управление, пока active: W/S (или стрелки) — газ и задний ход, A/D — руль,
-## пробел — тормоз, R — поставить на колёса, если перевернулась.
+## пробел — тормоз, R — поставить на колёса, если перевернулась. Пока active выключен
+## (водителя нет), машина стоит на ручнике; персонаж включает active, садясь в неё (клавиша E).
 ## S на ходу сначала тормозит, и только когда машина почти остановилась, включает задний ход.
 ## Руль на скорости становится мягче, а выше MAX_SPEED мотор не разгоняет: так машина не переворачивается.
 ##
@@ -28,11 +29,25 @@ var _phase_index := 0
 var _phase_time := 0.0
 var _phase_start_pos := Vector3.ZERO
 var _phase_start_yaw := 0.0
+var _speed_label: Label  # спидометр в углу экрана, виден пока active
 
 
 func _ready() -> void:
+	add_to_group("cars")  # по этой группе персонаж находит, куда сесть (E)
+	_speed_label = Label.new()
+	_speed_label.add_theme_font_size_override("font_size", 32)
+	_speed_label.position = Vector2(24, 16)
+	var layer := CanvasLayer.new()
+	layer.name = "Speedometer"
+	layer.add_child(_speed_label)
+	add_child(layer)
 	if test_program == "" and test_drive > 0.0:
 		test_program = "gas:%s" % test_drive
+	# enginectl game run --test car=gas:2,brake:1 передаёт аргумент --test-car=…, он важнее сцены.
+	var prefix := "--test-car="
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with(prefix):
+			test_program = arg.trim_prefix(prefix)
 	for part in test_program.split(",", false):
 		var pair := part.strip_edges().split(":")
 		if pair.size() == 2 and pair[1].is_valid_float():
@@ -93,6 +108,8 @@ func _physics_process(delta: float) -> void:
 			braking = true
 		if Input.is_physical_key_pressed(KEY_R):
 			flip_upright()
+	else:
+		braking = true  # без водителя машина стоит на ручнике
 
 	# Выше MAX_SPEED мотор не толкает вперёд (назад — вполовину медленнее).
 	if gas > 0.0 and forward_speed > MAX_SPEED:
@@ -103,6 +120,9 @@ func _physics_process(delta: float) -> void:
 	var steer_limit := lerpf(MAX_STEER, MIN_STEER, clampf(speed / MAX_SPEED, 0.0, 1.0))
 	steering = move_toward(steering, steer_input * steer_limit, STEER_SPEED * delta)
 	brake = BRAKE_FORCE if braking else 0.0
+	_speed_label.visible = active
+	if active:
+		_speed_label.text = "%d км/ч" % roundi(absf(forward_speed) * 3.6)
 
 
 ## Ставит машину на колёса на том же месте (после переворота).
