@@ -10,7 +10,9 @@
 - Запрос: `{"token": "...", "command": "doctor", "args": {}}`.
 - Неверный токен — ответ с `status: "error"`.
 
-Запуск: `python tools/enginectl/enginectl.py doctor` из папки проекта.
+Запуск: `python tools/enginectl/enginectl.py doctor` из папки проекта (на Windows при необходимости `py -3`).
+
+Самопроверка плагина без enginectl: `Godot --headless --path <проект> --editor -- --ai-bridge-selftest`. Плагин подключается к своему порту, шлёт `doctor` с верным и с неверным токеном, печатает оба ответа и `AI Bridge selftest: PASS`/`FAIL`, затем закрывает редактор с кодом 0/1.
 
 Каждый ответ содержит: `status`, `result`, `errors`, `warnings`, `files`.
 

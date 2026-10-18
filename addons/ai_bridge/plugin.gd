@@ -12,10 +12,14 @@ const PORT_TRIES := 10
 const STATE_DIR := "res://.godot/ai_bridge"
 const MAX_LINE_BYTES := 1024 * 1024
 
+const SELFTEST_FLAG := "--ai-bridge-selftest"
+const SELFTEST_TIMEOUT_FRAMES := 600
+
 var _server := TCPServer.new()
 var _clients: Array[Dictionary] = []
 var _token := ""
 var _port := 0
+var _selftest := {"stage": 0, "peer": null, "buffer": PackedByteArray(), "results": [], "frames": 0}
 
 
 func _enter_tree() -> void:
@@ -29,6 +33,8 @@ func _enter_tree() -> void:
 		return
 	_write_connection_file()
 	print("AI Bridge %s: слушаю %s:%d" % [PLUGIN_VERSION, HOST, _port])
+	if SELFTEST_FLAG in OS.get_cmdline_user_args():
+		_selftest.stage = 1
 
 
 func _exit_tree() -> void:
@@ -65,6 +71,75 @@ func _process(_delta: float) -> void:
 			c.buffer = c.buffer.slice(newline + 1)
 			_send(peer, _handle_line(line))
 			newline = c.buffer.find(10)
+
+	if _selftest.stage > 0:
+		_run_selftest()
+
+
+## Самопроверка: плагин сам подключается к своему порту как обычный клиент и шлёт два
+## запроса (верный и неверный токен), печатает ответы и закрывает редактор.
+## Запуск: Godot --headless --path <проект> --editor -- --ai-bridge-selftest
+func _run_selftest() -> void:
+	_selftest.frames += 1
+	if _selftest.frames > SELFTEST_TIMEOUT_FRAMES:
+		_selftest_finish("ответ не пришёл за %d кадров" % SELFTEST_TIMEOUT_FRAMES)
+		return
+	match _selftest.stage:
+		1:
+			var peer := StreamPeerTCP.new()
+			if peer.connect_to_host(HOST, _port) != OK:
+				_selftest_finish("не удалось подключиться к %s:%d" % [HOST, _port])
+				return
+			_selftest.peer = peer
+			_selftest.stage = 2
+		2:
+			var peer: StreamPeerTCP = _selftest.peer
+			peer.poll()
+			var status := peer.get_status()
+			if status == StreamPeerTCP.STATUS_CONNECTED:
+				for request in [
+					{"token": _token, "command": "doctor", "args": {}},
+					{"token": "wrong-token", "command": "doctor", "args": {}},
+				]:
+					peer.put_data((JSON.stringify(request) + "\n").to_utf8_buffer())
+				_selftest.stage = 3
+			elif status == StreamPeerTCP.STATUS_ERROR or status == StreamPeerTCP.STATUS_NONE:
+				_selftest_finish("соединение с %s:%d не установилось" % [HOST, _port])
+		3:
+			var peer: StreamPeerTCP = _selftest.peer
+			peer.poll()
+			var available := peer.get_available_bytes()
+			if available > 0:
+				var got := peer.get_data(available)
+				if got[0] == OK:
+					_selftest.buffer.append_array(got[1])
+			var newline: int = _selftest.buffer.find(10)
+			while newline != -1:
+				_selftest.results.append(_selftest.buffer.slice(0, newline).get_string_from_utf8())
+				_selftest.buffer = _selftest.buffer.slice(newline + 1)
+				newline = _selftest.buffer.find(10)
+			if _selftest.results.size() >= 2:
+				_selftest_finish("")
+
+
+func _selftest_finish(error: String) -> void:
+	_selftest.stage = 0
+	if _selftest.peer != null:
+		_selftest.peer.disconnect_from_host()
+	var passed := false
+	if error != "":
+		printerr("AI Bridge selftest: FAIL: %s" % error)
+	else:
+		print("AI Bridge selftest: ответ на верный токен: %s" % _selftest.results[0])
+		print("AI Bridge selftest: ответ на неверный токен: %s" % _selftest.results[1])
+		var first = JSON.parse_string(_selftest.results[0])
+		var second = JSON.parse_string(_selftest.results[1])
+		passed = (
+			typeof(first) == TYPE_DICTIONARY and first.get("status") == "ok"
+			and typeof(second) == TYPE_DICTIONARY and second.get("status") == "error"
+		)
+		print("AI Bridge selftest: %s" % ("PASS" if passed else "FAIL"))
+	get_tree().quit(0 if passed else 1)
 
 
 func _handle_line(line: String) -> Dictionary:
