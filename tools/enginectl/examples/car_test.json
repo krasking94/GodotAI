@@ -1,5 +1,5 @@
 {
-  "phrase": "Сделай большую ровную площадку под небом и поставь на неё красную машину с четырьмя колёсами, на которой можно ездить: газ, руль, тормоз. Камера сзади машины",
+  "phrase": "Сделай большую ровную площадку под небом и поставь на неё красную машину с четырьмя колёсами, на которой можно ездить: газ, руль, тормоз. Камера едет следом за машиной и не наклоняется",
   "scene": {
     "path": "res://scenes/car_test.tscn",
     "root_type": "Node3D",
@@ -21,8 +21,8 @@
         "mesh": {
           "primitive": "plane",
           "size": [
-            60,
-            60
+            400,
+            400
           ],
           "color": "#8a8a80"
         }
@@ -37,9 +37,9 @@
         "shape": {
           "primitive": "box",
           "size": [
-            60,
+            400,
             0.2,
-            60
+            400
           ]
         },
         "position": [
@@ -93,15 +93,15 @@
           1,
           0
         ],
-        "mass": 150,
+        "mass": 800,
         "center_of_mass_mode": 1,
         "center_of_mass": [
           0,
-          -0.2,
+          -0.35,
           0
         ],
         "script": "res://game/car.gd",
-        "test_drive": 2.0
+        "test_program": "gas:2,left:1,brake:1"
       }
     },
     {
@@ -184,8 +184,11 @@
         "wheel_radius": 0.35,
         "wheel_rest_length": 0.3,
         "suspension_travel": 0.2,
-        "suspension_stiffness": 40,
-        "wheel_friction_slip": 3
+        "suspension_stiffness": 45,
+        "wheel_friction_slip": 9,
+        "damping_compression": 1.2,
+        "damping_relaxation": 1.6,
+        "wheel_roll_influence": 0.05
       }
     },
     {
@@ -222,8 +225,11 @@
         "wheel_radius": 0.35,
         "wheel_rest_length": 0.3,
         "suspension_travel": 0.2,
-        "suspension_stiffness": 40,
-        "wheel_friction_slip": 3
+        "suspension_stiffness": 45,
+        "wheel_friction_slip": 9,
+        "damping_compression": 1.2,
+        "damping_relaxation": 1.6,
+        "wheel_roll_influence": 0.05
       }
     },
     {
@@ -260,8 +266,11 @@
         "wheel_radius": 0.35,
         "wheel_rest_length": 0.3,
         "suspension_travel": 0.2,
-        "suspension_stiffness": 40,
-        "wheel_friction_slip": 3
+        "suspension_stiffness": 45,
+        "wheel_friction_slip": 9,
+        "damping_compression": 1.2,
+        "damping_relaxation": 1.6,
+        "wheel_roll_influence": 0.05
       }
     },
     {
@@ -298,8 +307,11 @@
         "wheel_radius": 0.35,
         "wheel_rest_length": 0.3,
         "suspension_travel": 0.2,
-        "suspension_stiffness": 40,
-        "wheel_friction_slip": 3
+        "suspension_stiffness": 45,
+        "wheel_friction_slip": 9,
+        "damping_compression": 1.2,
+        "damping_relaxation": 1.6,
+        "wheel_roll_influence": 0.05
       }
     },
     {
@@ -323,20 +335,14 @@
     },
     {
       "op": "create",
-      "parent": "Car",
-      "name": "Camera",
+      "parent": ".",
+      "name": "ChaseCamera",
       "type": "Camera3D",
       "props": {
-        "position": [
-          0,
-          3,
-          7
-        ],
-        "rotation_degrees": [
-          -18,
-          0,
-          0
-        ],
+        "script": "res://game/chase_camera.gd",
+        "target": "../Car",
+        "distance": 8,
+        "height": 3.5,
         "current": true
       }
     }

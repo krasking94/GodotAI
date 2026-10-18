@@ -1,170 +1,186 @@
 [gd_scene format=3 uid="uid://bheqqc1ql7y7w"]
 
 [ext_resource type="Script" uid="uid://d4atl6etq5g8y" path="res://game/car.gd" id="1_h3lgv"]
+[ext_resource type="Script" uid="uid://cg8wdlisr0ti7" path="res://game/chase_camera.gd" id="2_f47dj"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_h3lgv"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_f47dj"]
 albedo_color = Color(0.5411765, 0.5411765, 0.5019608, 1)
 
-[sub_resource type="PlaneMesh" id="PlaneMesh_f47dj"]
-material = SubResource("StandardMaterial3D_h3lgv")
-size = Vector2(60, 60)
+[sub_resource type="PlaneMesh" id="PlaneMesh_d5ml3"]
+material = SubResource("StandardMaterial3D_f47dj")
+size = Vector2(400, 400)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_d5ml3"]
-size = Vector3(60, 0.2, 60)
+[sub_resource type="BoxShape3D" id="BoxShape3D_seovh"]
+size = Vector3(400, 0.2, 400)
 
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_seovh"]
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1a1fu"]
 sky_top_color = Color(0.2901961, 0.5254902, 0.84705883, 1)
 sky_horizon_color = Color(0.72156864, 0.8235294, 0.9411765, 1)
 ground_horizon_color = Color(0.72156864, 0.8235294, 0.9411765, 1)
 
-[sub_resource type="Sky" id="Sky_1a1fu"]
-sky_material = SubResource("ProceduralSkyMaterial_seovh")
+[sub_resource type="Sky" id="Sky_cte05"]
+sky_material = SubResource("ProceduralSkyMaterial_1a1fu")
 
-[sub_resource type="Environment" id="Environment_cte05"]
+[sub_resource type="Environment" id="Environment_gglpn"]
 background_mode = 2
-sky = SubResource("Sky_1a1fu")
+sky = SubResource("Sky_cte05")
 ambient_light_source = 3
 ambient_light_energy = 0.8
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_gglpn"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_jdvc1"]
 size = Vector3(1.8, 0.6, 4)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_jdvc1"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gm8sd"]
 albedo_color = Color(0.7529412, 0.22352941, 0.16862746, 1)
 
-[sub_resource type="BoxMesh" id="BoxMesh_gm8sd"]
-material = SubResource("StandardMaterial3D_jdvc1")
+[sub_resource type="BoxMesh" id="BoxMesh_o01lw"]
+material = SubResource("StandardMaterial3D_gm8sd")
 size = Vector3(1.8, 0.6, 4)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_o01lw"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_y2m84"]
 albedo_color = Color(0.42745098, 0.48235294, 0.5529412, 1)
 
-[sub_resource type="BoxMesh" id="BoxMesh_y2m84"]
-material = SubResource("StandardMaterial3D_o01lw")
+[sub_resource type="BoxMesh" id="BoxMesh_j7oku"]
+material = SubResource("StandardMaterial3D_y2m84")
 size = Vector3(1.5, 0.5, 1.8)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_j7oku"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gaoq8"]
 albedo_color = Color(0.13333334, 0.13333334, 0.13333334, 1)
 
-[sub_resource type="CylinderMesh" id="CylinderMesh_gaoq8"]
-material = SubResource("StandardMaterial3D_j7oku")
+[sub_resource type="CylinderMesh" id="CylinderMesh_rf1x0"]
+material = SubResource("StandardMaterial3D_gaoq8")
 top_radius = 0.35
 bottom_radius = 0.35
 height = 0.25
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rf1x0"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_uu4pf"]
 albedo_color = Color(0.13333334, 0.13333334, 0.13333334, 1)
 
-[sub_resource type="CylinderMesh" id="CylinderMesh_uu4pf"]
-material = SubResource("StandardMaterial3D_rf1x0")
+[sub_resource type="CylinderMesh" id="CylinderMesh_wmo0b"]
+material = SubResource("StandardMaterial3D_uu4pf")
 top_radius = 0.35
 bottom_radius = 0.35
 height = 0.25
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wmo0b"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_a2053"]
 albedo_color = Color(0.13333334, 0.13333334, 0.13333334, 1)
 
-[sub_resource type="CylinderMesh" id="CylinderMesh_a2053"]
-material = SubResource("StandardMaterial3D_wmo0b")
+[sub_resource type="CylinderMesh" id="CylinderMesh_x0i38"]
+material = SubResource("StandardMaterial3D_a2053")
 top_radius = 0.35
 bottom_radius = 0.35
 height = 0.25
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_x0i38"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ogjy4"]
 albedo_color = Color(0.13333334, 0.13333334, 0.13333334, 1)
 
-[sub_resource type="CylinderMesh" id="CylinderMesh_ogjy4"]
-material = SubResource("StandardMaterial3D_x0i38")
+[sub_resource type="CylinderMesh" id="CylinderMesh_b8gws"]
+material = SubResource("StandardMaterial3D_ogjy4")
 top_radius = 0.35
 bottom_radius = 0.35
 height = 0.25
 
-[node name="CarTest" type="Node3D" unique_id=1232071781]
+[node name="CarTest" type="Node3D" unique_id=280316852]
 
-[node name="Ground" type="StaticBody3D" parent="." unique_id=1368109309]
+[node name="Ground" type="StaticBody3D" parent="." unique_id=1997225079]
 
-[node name="Mesh" type="MeshInstance3D" parent="Ground" unique_id=1510748527]
-mesh = SubResource("PlaneMesh_f47dj")
+[node name="Mesh" type="MeshInstance3D" parent="Ground" unique_id=1333856225]
+mesh = SubResource("PlaneMesh_d5ml3")
 
-[node name="Shape" type="CollisionShape3D" parent="Ground" unique_id=716272194]
+[node name="Shape" type="CollisionShape3D" parent="Ground" unique_id=1624164567]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
-shape = SubResource("BoxShape3D_d5ml3")
+shape = SubResource("BoxShape3D_seovh")
 
-[node name="Lamp" type="DirectionalLight3D" parent="." unique_id=1161870218]
+[node name="Lamp" type="DirectionalLight3D" parent="." unique_id=1347942552]
 transform = Transform3D(0.90630776, -0.34618863, 0.24240388, 0, 0.57357645, 0.81915206, -0.42261827, -0.74240386, 0.5198368, 0, 10, 0)
 shadow_enabled = true
 
-[node name="Sky" type="WorldEnvironment" parent="." unique_id=695249011]
-environment = SubResource("Environment_cte05")
+[node name="Sky" type="WorldEnvironment" parent="." unique_id=357828349]
+environment = SubResource("Environment_gglpn")
 
-[node name="Car" type="VehicleBody3D" parent="." unique_id=418552108]
+[node name="Car" type="VehicleBody3D" parent="." unique_id=1874421384]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
-mass = 150.0
+mass = 800.0
 center_of_mass_mode = 1
-center_of_mass = Vector3(0, -0.2, 0)
+center_of_mass = Vector3(0, -0.35, 0)
 script = ExtResource("1_h3lgv")
-test_drive = 2.0
+test_program = "gas:2,left:1,brake:1"
 
-[node name="Shape" type="CollisionShape3D" parent="Car" unique_id=641627959]
+[node name="Shape" type="CollisionShape3D" parent="Car" unique_id=1076237207]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
-shape = SubResource("BoxShape3D_gglpn")
+shape = SubResource("BoxShape3D_jdvc1")
 
-[node name="Body" type="MeshInstance3D" parent="Car" unique_id=1431136933]
+[node name="Body" type="MeshInstance3D" parent="Car" unique_id=1325225631]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
-mesh = SubResource("BoxMesh_gm8sd")
+mesh = SubResource("BoxMesh_o01lw")
 
-[node name="Cabin" type="MeshInstance3D" parent="Car" unique_id=2040483659]
+[node name="Cabin" type="MeshInstance3D" parent="Car" unique_id=1883341656]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, -0.3)
-mesh = SubResource("BoxMesh_y2m84")
+mesh = SubResource("BoxMesh_j7oku")
 
-[node name="WheelFL" type="VehicleWheel3D" parent="Car" unique_id=448872218]
+[node name="WheelFL" type="VehicleWheel3D" parent="Car" unique_id=71181581]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.85, 0, 1.3)
 use_as_steering = true
+wheel_roll_influence = 0.05
 wheel_radius = 0.35
 wheel_rest_length = 0.3
-wheel_friction_slip = 3.0
-suspension_stiffness = 40.0
+wheel_friction_slip = 9.0
+suspension_stiffness = 45.0
+damping_compression = 1.2
+damping_relaxation = 1.6
 
-[node name="Mesh" type="MeshInstance3D" parent="Car/WheelFL" unique_id=1106152083]
+[node name="Mesh" type="MeshInstance3D" parent="Car/WheelFL" unique_id=1445524524]
 transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
-mesh = SubResource("CylinderMesh_gaoq8")
+mesh = SubResource("CylinderMesh_rf1x0")
 
-[node name="WheelFR" type="VehicleWheel3D" parent="Car" unique_id=653462135]
+[node name="WheelFR" type="VehicleWheel3D" parent="Car" unique_id=936939523]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.85, 0, 1.3)
 use_as_steering = true
+wheel_roll_influence = 0.05
 wheel_radius = 0.35
 wheel_rest_length = 0.3
-wheel_friction_slip = 3.0
-suspension_stiffness = 40.0
+wheel_friction_slip = 9.0
+suspension_stiffness = 45.0
+damping_compression = 1.2
+damping_relaxation = 1.6
 
-[node name="Mesh" type="MeshInstance3D" parent="Car/WheelFR" unique_id=1390630336]
+[node name="Mesh" type="MeshInstance3D" parent="Car/WheelFR" unique_id=877119840]
 transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
-mesh = SubResource("CylinderMesh_uu4pf")
+mesh = SubResource("CylinderMesh_wmo0b")
 
-[node name="WheelBL" type="VehicleWheel3D" parent="Car" unique_id=104043485]
+[node name="WheelBL" type="VehicleWheel3D" parent="Car" unique_id=821972527]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.85, 0, -1.3)
 use_as_traction = true
+wheel_roll_influence = 0.05
 wheel_radius = 0.35
 wheel_rest_length = 0.3
-wheel_friction_slip = 3.0
-suspension_stiffness = 40.0
+wheel_friction_slip = 9.0
+suspension_stiffness = 45.0
+damping_compression = 1.2
+damping_relaxation = 1.6
 
-[node name="Mesh" type="MeshInstance3D" parent="Car/WheelBL" unique_id=247784927]
+[node name="Mesh" type="MeshInstance3D" parent="Car/WheelBL" unique_id=193368616]
 transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
-mesh = SubResource("CylinderMesh_a2053")
+mesh = SubResource("CylinderMesh_x0i38")
 
-[node name="WheelBR" type="VehicleWheel3D" parent="Car" unique_id=27252384]
+[node name="WheelBR" type="VehicleWheel3D" parent="Car" unique_id=320756235]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.85, 0, -1.3)
 use_as_traction = true
+wheel_roll_influence = 0.05
 wheel_radius = 0.35
 wheel_rest_length = 0.3
-wheel_friction_slip = 3.0
-suspension_stiffness = 40.0
+wheel_friction_slip = 9.0
+suspension_stiffness = 45.0
+damping_compression = 1.2
+damping_relaxation = 1.6
 
-[node name="Mesh" type="MeshInstance3D" parent="Car/WheelBR" unique_id=1333917034]
+[node name="Mesh" type="MeshInstance3D" parent="Car/WheelBR" unique_id=1381804072]
 transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
-mesh = SubResource("CylinderMesh_ogjy4")
+mesh = SubResource("CylinderMesh_b8gws")
 
-[node name="Camera" type="Camera3D" parent="Car" unique_id=1822778905]
-transform = Transform3D(1, 0, 0, 0, 0.95105654, 0.309017, 0, -0.309017, 0.95105654, 0, 3, 7)
+[node name="ChaseCamera" type="Camera3D" parent="." unique_id=1559469964]
 current = true
+script = ExtResource("2_f47dj")
+target = NodePath("../Car")
+distance = 8.0
+height = 3.5
