@@ -5,7 +5,7 @@ extends EditorPlugin
 ## Запрос: {"token": "...", "command": "doctor", "args": {}}
 ## Ответ:  {"status": "ok"|"error", "result": {...}, "errors": [], "warnings": [], "files": []}
 
-const PLUGIN_VERSION := "0.4.0"
+const PLUGIN_VERSION := "0.5.0"
 const HOST := "127.0.0.1"
 const DEFAULT_PORT := 47615
 const PORT_TRIES := 10
@@ -162,6 +162,8 @@ func _handle_line(line: String) -> Dictionary:
 			return _scene_save()
 		"scene.new":
 			return _scene_new(args)
+		"scene.build":
+			return _scene_build(args)
 		"scene.open":
 			return _scene_open(args)
 		"script.set":
@@ -529,6 +531,10 @@ func _to_json(value: Variant) -> Variant:
 				return null
 			if value is Resource and value.resource_path != "":
 				return value.resource_path
+			if value is PrimitiveMesh:
+				return _describe_mesh(value)
+			if value is StandardMaterial3D:
+				return {"material": "StandardMaterial3D", "color": _to_json(value.albedo_color)}
 			return value.get_class()
 		TYPE_NIL, TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_ARRAY, TYPE_DICTIONARY:
 			return value
@@ -794,3 +800,139 @@ func _project_main_scene(args: Dictionary) -> Dictionary:
 	var response := _ok({"main_scene": path})
 	response["files"] = ["res://project.godot"]
 	return response
+
+
+## Примитивный меш в виде, пригодном для плана: тип, размеры, цвет.
+func _describe_mesh(mesh: PrimitiveMesh) -> Dictionary:
+	var info := {"mesh": mesh.get_class()}
+	if mesh is BoxMesh or mesh is PlaneMesh:
+		info["size"] = _to_json(mesh.size)
+	elif mesh is SphereMesh:
+		info["radius"] = mesh.radius
+		info["height"] = mesh.height
+	elif mesh is CylinderMesh:
+		info["radius"] = mesh.top_radius
+		info["height"] = mesh.height
+	elif mesh is CapsuleMesh:
+		info["radius"] = mesh.radius
+		info["height"] = mesh.height
+	if mesh.material is StandardMaterial3D:
+		info["color"] = _to_json(mesh.material.albedo_color)
+	return info
+
+
+# ---------------------------------------------------------------------------
+# scene.build: новая сцена целиком за один шаг — «пол, две стены и свет одной фразой».
+# args: path ("res://scenes/room.tscn"), root_type (Node3D), root_name (по умолчанию из имени файла),
+#       ops — операции create/set как в scene.apply, overwrite (false), open (true), main_scene (false).
+# Сцена собирается в памяти, поэтому файл появляется только если все операции верны.
+# После сохранения файл читается обратно с диска (мимо кэша) и узлы пересчитываются:
+# так проверяется, что сцена действительно сохранилась и откроется заново.
+# ---------------------------------------------------------------------------
+
+func _scene_build(args: Dictionary) -> Dictionary:
+	var path := str(args.get("path", ""))
+	if not path.begins_with("res://") or not path.ends_with(".tscn") or path.contains(".."):
+		return _error("path должен быть вида res://папка/имя.tscn")
+	var overwrite := bool(args.get("overwrite", false))
+	if FileAccess.file_exists(path) and not overwrite:
+		return _error("Файл «%s» уже существует: укажите другой путь или overwrite" % path)
+	var root_type := str(args.get("root_type", "Node3D"))
+	if not ClassDB.class_exists(root_type) or not ClassDB.can_instantiate(root_type) or not ClassDB.is_parent_class(root_type, "Node"):
+		return _error("root_type «%s» не существует или это не узел" % root_type)
+	var root_name := str(args.get("root_name", path.get_file().get_basename().to_pascal_case()))
+	if root_name == "" or root_name.validate_node_name() != root_name:
+		return _error("root_name «%s» пустое или содержит недопустимые символы" % root_name)
+	var ops = args.get("ops", [])
+	if typeof(ops) != TYPE_ARRAY or ops.is_empty():
+		return _error("Поле ops должно быть непустым списком операций")
+
+	var root: Node = ClassDB.instantiate(root_type)
+	root.name = root_name
+	var plan: Array = []
+	var errors: Array = []
+	var steps: Array = []
+	var created: Dictionary = {}
+	var deleted: Dictionary = {}
+	for i in ops.size():
+		var op = ops[i]
+		if typeof(op) != TYPE_DICTIONARY:
+			errors.append("Операция %d: должна быть объектом" % i)
+			continue
+		var kind := str(op.get("op", ""))
+		match kind:
+			"create":
+				_plan_create(i, op, root, created, deleted, plan, steps, errors)
+			"set":
+				_plan_set(i, op, root, created, deleted, plan, steps, errors)
+			_:
+				errors.append("Операция %d: в новой сцене допустимы только create и set, получено «%s»" % [i, kind])
+	if not errors.is_empty():
+		for node in created.values():
+			node.free()
+		root.free()
+		var response := _error("Сцена не создана: найдены ошибки")
+		response["errors"] = errors
+		response["result"] = {"plan": plan, "scene_path": path, "built": false}
+		return response
+
+	# Узлы пока не в дереве: добавляем их по порядку и назначаем владельца, иначе они не попадут в файл.
+	for step in steps:
+		match step["kind"]:
+			"create":
+				step["parent"].add_child(step["node"])
+				step["node"].owner = root
+			"set":
+				step["node"].set(step["prop"], step["value"])
+	var node_count := _count_nodes(root)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
+	var packed := PackedScene.new()
+	var err := packed.pack(root)
+	root.free()
+	if err != OK:
+		return _error("Не удалось собрать сцену: %s" % error_string(err))
+	err = ResourceSaver.save(packed, path)
+	if err != OK:
+		return _error("Не удалось сохранить «%s»: %s" % [path, error_string(err)])
+
+	# Проверка: файл читается обратно с диска, число узлов должно совпасть.
+	var warnings: Array = []
+	var reread_count := -1
+	var reloaded := ResourceLoader.load(path, "PackedScene", ResourceLoader.CACHE_MODE_IGNORE) as PackedScene
+	if reloaded != null:
+		var copy := reloaded.instantiate()
+		reread_count = _count_nodes(copy)
+		copy.free()
+	if reread_count != node_count:
+		warnings.append("Файл сохранён, но при чтении обратно узлов %d вместо %d" % [reread_count, node_count])
+
+	EditorInterface.get_resource_filesystem().scan()
+	var opened := false
+	if bool(args.get("open", true)):
+		if overwrite and _edited_scene_path() == path:
+			EditorInterface.reload_scene_from_path(path)
+		else:
+			EditorInterface.open_scene_from_path(path)
+		opened = true
+	var main_set := false
+	if bool(args.get("main_scene", false)):
+		ProjectSettings.set_setting("application/run/main_scene", path)
+		if ProjectSettings.save() == OK:
+			main_set = true
+		else:
+			warnings.append("Сцена создана, но назначить её главной не удалось (project.godot не сохранился)")
+
+	var response := _ok({"scene_path": path, "root_type": root_type, "root_name": root_name,
+		"node_count": node_count, "reread_node_count": reread_count, "built": true, "opened": opened,
+		"main_scene": main_set, "plan": plan,
+		"undo_hint": "Сцена новая, в истории Undo её нет; чтобы убрать, удалите файл %s" % path})
+	response["warnings"] = warnings
+	response["files"] = [path] if not main_set else [path, "res://project.godot"]
+	return response
+
+
+func _count_nodes(node: Node) -> int:
+	var count := 1
+	for child in node.get_children():
+		count += _count_nodes(child)
+	return count

@@ -8,6 +8,7 @@
 import argparse
 import json
 import os
+import shutil
 import signal
 import socket
 import subprocess
@@ -66,6 +67,9 @@ def send(project: Path, command: str, args: dict) -> dict:
                     break
                 data += chunk
     except OSError as exc:
+        if not process_alive(conn.get("pid", 0)):
+            return fail("Godot не на связи: файл подключения остался от уже закрытого редактора. "
+                        "Откройте проект в Godot и повторите команду.")
         return fail(f"Godot не отвечает на {conn['host']}:{conn['port']} ({exc}). Редактор закрыт или плагин выключен?")
     if not data:
         return fail("Godot закрыл соединение без ответа")
@@ -76,12 +80,22 @@ def send(project: Path, command: str, args: dict) -> dict:
 # Запуск игры отдельным процессом Godot
 # ---------------------------------------------------------------------------
 
+def looks_like_godot(path: Path) -> bool:
+    """Файл Godot рядом с проектом: Godot_v4.7.2-stable_win64.exe, Godot_v4.7.2-stable_linux.x86_64 и т.п."""
+    return (path.is_file() and path.name.lower().startswith("godot")
+            and path.suffix.lower() in ("", ".exe", ".x86_64", ".arm64", ".x86_32"))
+
+
 def find_godot(project: Path, explicit: str | None) -> Path | None:
-    """Путь к Godot: --godot, переменная GODOT_EXE, либо файл подключения открытого редактора."""
+    """Путь к Godot: --godot, переменная GODOT_EXE, файл подключения открытого редактора,
+    `godot` в PATH, либо файл Godot* в папке проекта или на уровень выше."""
     candidates = [explicit, os.environ.get("GODOT_EXE")]
     conn = read_connection(project)
     if conn and conn.get("godot_exe"):
         candidates.append(conn["godot_exe"])
+    candidates += [shutil.which("godot"), shutil.which("godot4")]
+    for folder in (project, project.parent):
+        candidates += sorted(str(p) for p in folder.glob("[Gg]odot*") if looks_like_godot(p))
     for candidate in candidates:
         if candidate and Path(candidate).is_file():
             exe = Path(candidate)
@@ -97,8 +111,12 @@ def find_godot(project: Path, explicit: str | None) -> Path | None:
 def game_run(project: Path, options) -> dict:
     godot = find_godot(project, options.godot)
     if godot is None:
-        return fail("Не найден исполняемый файл Godot: откройте проект в редакторе, "
-                    "задайте переменную GODOT_EXE или укажите --godot <путь>")
+        conn = read_connection(project)
+        hint = ("Редактор открыт, но файл подключения записан старой версией плагина: "
+                "в Godot выберите «Проект → Перезагрузить текущий проект». Либо "
+                if conn and not conn.get("godot_exe") else "")
+        return fail(f"Не найден исполняемый файл Godot. {hint}откройте проект в редакторе, положите Godot в папку "
+                    "проекта или на уровень выше, задайте переменную GODOT_EXE или укажите --godot <путь>")
     info = read_run_info(project)
     if info and info.get("running") and process_alive(info.get("pid", 0)):
         return fail(f"Игра уже запущена (pid {info['pid']}). Остановите её: enginectl game stop")
@@ -283,6 +301,16 @@ def build_parser() -> argparse.ArgumentParser:
     new.add_argument("--path", required=True, help="куда сохранить, например res://scenes/yard.tscn")
     new.add_argument("--root-type", default="Node3D", help="тип корневого узла (по умолчанию Node3D)")
     new.add_argument("--root-name", help="имя корневого узла (по умолчанию из имени файла)")
+    build = scene_sub.add_parser("build", help="создать новую сцену целиком за один шаг: корень, объекты, сохранение")
+    build_source = build.add_mutually_exclusive_group(required=True)
+    build_source.add_argument("--file", type=Path, help="JSON с полями scene {path, root_type, root_name} и ops (как в apply)")
+    build_source.add_argument("--ops", help="список операций прямо в строке JSON (тогда нужен --path)")
+    build.add_argument("--path", help="куда сохранить, например res://scenes/room.tscn (важнее, чем scene.path в файле)")
+    build.add_argument("--root-type", help="тип корневого узла (по умолчанию из файла или Node3D)")
+    build.add_argument("--root-name", help="имя корневого узла (по умолчанию из файла или из имени сцены)")
+    build.add_argument("--overwrite", action="store_true", help="перезаписать сцену, если файл уже есть")
+    build.add_argument("--main", action="store_true", help="сразу назначить сцену главной (её запускает кнопка «Запустить»)")
+    build.add_argument("--no-open", action="store_true", help="не открывать сцену в редакторе после создания")
 
     script = sub.add_parser("script", help="скрипты GDScript")
     script_sub = script.add_subparsers(dest="script_command", required=True)
@@ -352,6 +380,22 @@ def dispatch(project: Path, options) -> dict:
             args = {"path": options.path, "root_type": options.root_type}
             if options.root_name:
                 args["root_name"] = options.root_name
+        elif options.scene_command == "build":
+            try:
+                raw = json.loads(options.file.read_text(encoding="utf-8") if options.file else options.ops)
+            except (OSError, json.JSONDecodeError) as exc:
+                return fail(f"Не удалось прочитать описание сцены: {exc}")
+            spec = raw if isinstance(raw, dict) else {"ops": raw}
+            scene = spec.get("scene") if isinstance(spec.get("scene"), dict) else {}
+            path = options.path or scene.get("path")
+            if not path:
+                return fail("Укажите, куда сохранить сцену: --path res://scenes/имя.tscn или поле scene.path в файле")
+            args = {"path": path, "ops": spec.get("ops"), "overwrite": options.overwrite,
+                    "open": not options.no_open, "main_scene": options.main,
+                    "root_type": options.root_type or scene.get("root_type", "Node3D")}
+            root_name = options.root_name or scene.get("root_name")
+            if root_name:
+                args["root_name"] = root_name
         return send(project, f"scene.{options.scene_command}", args)
     if options.command == "script":
         content = options.file.read_text(encoding="utf-8") if options.file else options.content
