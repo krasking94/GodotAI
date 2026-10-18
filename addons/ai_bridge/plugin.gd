@@ -5,7 +5,7 @@ extends EditorPlugin
 ## Запрос: {"token": "...", "command": "doctor", "args": {}}
 ## Ответ:  {"status": "ok"|"error", "result": {...}, "errors": [], "warnings": [], "files": []}
 
-const PLUGIN_VERSION := "0.5.0"
+const PLUGIN_VERSION := "0.6.0"
 const HOST := "127.0.0.1"
 const DEFAULT_PORT := 47615
 const PORT_TRIES := 10
@@ -385,6 +385,8 @@ func _coerce(node: Node, prop: String, value: Variant) -> Dictionary:
 		return {"error": "у %s нет свойства «%s»" % [node.get_class(), prop]}
 	if prop == "mesh" and typeof(value) == TYPE_DICTIONARY:
 		return _make_mesh(value)
+	if prop == "shape" and typeof(value) == TYPE_DICTIONARY:
+		return _make_shape(value)
 	if prop == "material_override" or prop == "material":
 		if typeof(value) == TYPE_DICTIONARY:
 			return _make_material(value)
@@ -505,6 +507,40 @@ func _make_mesh(spec: Dictionary) -> Dictionary:
 	return {"value": mesh}
 
 
+## Физическая форма для CollisionShape3D: {"primitive": "box"|"sphere"|"capsule"|"cylinder", "size": [x, y, z], "radius": r, "height": h}.
+func _make_shape(spec: Dictionary) -> Dictionary:
+	var primitive := str(spec.get("primitive", "box"))
+	match primitive:
+		"box":
+			var box := BoxShape3D.new()
+			if spec.has("size"):
+				if not _is_number_array(spec["size"], 3):
+					return {"error": "size для box: список из 3 чисел"}
+				box.size = Vector3(spec["size"][0], spec["size"][1], spec["size"][2])
+			return {"value": box}
+		"sphere":
+			var sphere := SphereShape3D.new()
+			if spec.has("radius"):
+				sphere.radius = float(spec["radius"])
+			return {"value": sphere}
+		"capsule":
+			var capsule := CapsuleShape3D.new()
+			if spec.has("radius"):
+				capsule.radius = float(spec["radius"])
+			if spec.has("height"):
+				capsule.height = float(spec["height"])
+			return {"value": capsule}
+		"cylinder":
+			var cylinder := CylinderShape3D.new()
+			if spec.has("radius"):
+				cylinder.radius = float(spec["radius"])
+			if spec.has("height"):
+				cylinder.height = float(spec["height"])
+			return {"value": cylinder}
+		_:
+			return {"error": "неизвестная форма «%s» (box, sphere, capsule, cylinder)" % primitive}
+
+
 func _make_material(spec: Dictionary) -> Dictionary:
 	var material := StandardMaterial3D.new()
 	if spec.has("color"):
@@ -533,6 +569,8 @@ func _to_json(value: Variant) -> Variant:
 				return value.resource_path
 			if value is PrimitiveMesh:
 				return _describe_mesh(value)
+			if value is Shape3D:
+				return _describe_shape(value)
 			if value is StandardMaterial3D:
 				return {"material": "StandardMaterial3D", "color": _to_json(value.albedo_color)}
 			return value.get_class()
@@ -821,6 +859,18 @@ func _describe_mesh(mesh: PrimitiveMesh) -> Dictionary:
 	return info
 
 
+func _describe_shape(shape: Shape3D) -> Dictionary:
+	var info := {"shape": shape.get_class()}
+	if shape is BoxShape3D:
+		info["size"] = _to_json(shape.size)
+	elif shape is SphereShape3D:
+		info["radius"] = shape.radius
+	elif shape is CapsuleShape3D or shape is CylinderShape3D:
+		info["radius"] = shape.radius
+		info["height"] = shape.height
+	return info
+
+
 # ---------------------------------------------------------------------------
 # scene.build: новая сцена целиком за один шаг — «пол, две стены и свет одной фразой».
 # args: path ("res://scenes/room.tscn"), root_type (Node3D), root_name (по умолчанию из имени файла),
@@ -909,10 +959,11 @@ func _scene_build(args: Dictionary) -> Dictionary:
 	EditorInterface.get_resource_filesystem().scan()
 	var opened := false
 	if bool(args.get("open", true)):
-		if overwrite and _edited_scene_path() == path:
+		# Если сцена уже открыта во вкладке (не обязательно текущей), её нужно перезагрузить с диска,
+		# иначе редактор покажет старое содержимое из памяти.
+		if overwrite and path in EditorInterface.get_open_scenes():
 			EditorInterface.reload_scene_from_path(path)
-		else:
-			EditorInterface.open_scene_from_path(path)
+		EditorInterface.open_scene_from_path(path)  # открыть или переключиться на вкладку
 		opened = true
 	var main_set := false
 	if bool(args.get("main_scene", false)):

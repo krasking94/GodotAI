@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://baecypi3hngpu"]
 
 [ext_resource type="Script" uid="uid://c0nqpwgf125k7" path="res://game/yard.gd" id="1_e7vks"]
+[ext_resource type="Script" uid="uid://doqqyxgfxaeov" path="res://game/player.gd" id="2_e3kx7"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_e3kx7"]
 albedo_color = Color(0.41960785, 0.5568628, 0.13725491, 1)
@@ -9,36 +10,73 @@ albedo_color = Color(0.41960785, 0.5568628, 0.13725491, 1)
 material = SubResource("StandardMaterial3D_e3kx7")
 size = Vector2(12, 12)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_g7wxf"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_g7wxf"]
+size = Vector3(12, 0.2, 12)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sclpj"]
 albedo_color = Color(0.6901961, 0.6901961, 0.6901961, 1)
 
-[sub_resource type="BoxMesh" id="BoxMesh_sclpj"]
-material = SubResource("StandardMaterial3D_g7wxf")
+[sub_resource type="BoxMesh" id="BoxMesh_gkmhu"]
+material = SubResource("StandardMaterial3D_sclpj")
 size = Vector3(12, 2, 0.3)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gkmhu"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_0xw55"]
+size = Vector3(12, 2, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_t6ggx"]
 albedo_color = Color(0.6901961, 0.6901961, 0.6901961, 1)
 
-[sub_resource type="BoxMesh" id="BoxMesh_0xw55"]
-material = SubResource("StandardMaterial3D_gkmhu")
+[sub_resource type="BoxMesh" id="BoxMesh_hra0h"]
+material = SubResource("StandardMaterial3D_t6ggx")
 size = Vector3(0.3, 2, 12)
 
-[node name="Yard" type="Node3D" unique_id=923702904]
+[sub_resource type="BoxShape3D" id="BoxShape3D_xw7ya"]
+size = Vector3(0.3, 2, 12)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_cvafj"]
+radius = 0.4
+height = 1.8
+
+[node name="Yard" type="Node3D" unique_id=1201052062]
 script = ExtResource("1_e7vks")
 
-[node name="Ground" type="MeshInstance3D" parent="." unique_id=1340479336]
+[node name="Ground" type="StaticBody3D" parent="." unique_id=1493994527]
+
+[node name="Mesh" type="MeshInstance3D" parent="Ground" unique_id=421869727]
 mesh = SubResource("PlaneMesh_cvr5o")
 
-[node name="WallNorth" type="MeshInstance3D" parent="." unique_id=1333479776]
+[node name="Shape" type="CollisionShape3D" parent="Ground" unique_id=1124829178]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+shape = SubResource("BoxShape3D_g7wxf")
+
+[node name="WallNorth" type="StaticBody3D" parent="." unique_id=1337531630]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -6)
-mesh = SubResource("BoxMesh_sclpj")
 
-[node name="WallEast" type="MeshInstance3D" parent="." unique_id=454148916]
+[node name="Mesh" type="MeshInstance3D" parent="WallNorth" unique_id=611888003]
+mesh = SubResource("BoxMesh_gkmhu")
+
+[node name="Shape" type="CollisionShape3D" parent="WallNorth" unique_id=53516051]
+shape = SubResource("BoxShape3D_0xw55")
+
+[node name="WallEast" type="StaticBody3D" parent="." unique_id=714597713]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1, 0)
-mesh = SubResource("BoxMesh_0xw55")
 
-[node name="Lamp" type="DirectionalLight3D" parent="." unique_id=155626929]
+[node name="Mesh" type="MeshInstance3D" parent="WallEast" unique_id=2145334964]
+mesh = SubResource("BoxMesh_hra0h")
+
+[node name="Shape" type="CollisionShape3D" parent="WallEast" unique_id=1947231579]
+shape = SubResource("BoxShape3D_xw7ya")
+
+[node name="Lamp" type="DirectionalLight3D" parent="." unique_id=269512908]
 transform = Transform3D(0.8660254, -0.38302222, 0.32139382, 0, 0.64278764, 0.76604444, -0.5, -0.66341394, 0.5566704, 0, 6, 0)
 
-[node name="Camera" type="Camera3D" parent="." unique_id=1823619159]
-transform = Transform3D(1, 0, 0, 0, 0.95105654, 0.309017, 0, -0.309017, 0.95105654, 0, 4, 12)
+[node name="Player" type="CharacterBody3D" parent="." unique_id=724171054]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 4)
+script = ExtResource("2_e3kx7")
+
+[node name="Shape" type="CollisionShape3D" parent="Player" unique_id=1688530674]
+shape = SubResource("CapsuleShape3D_cvafj")
+
+[node name="Camera" type="Camera3D" parent="Player" unique_id=1189529701]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
+current = true
