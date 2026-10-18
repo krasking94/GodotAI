@@ -5,7 +5,7 @@ extends EditorPlugin
 ## Запрос: {"token": "...", "command": "doctor", "args": {}}
 ## Ответ:  {"status": "ok"|"error", "result": {...}, "errors": [], "warnings": [], "files": []}
 
-const PLUGIN_VERSION := "0.7.0"
+const PLUGIN_VERSION := "0.8.0"
 const HOST := "127.0.0.1"
 const DEFAULT_PORT := 47615
 const PORT_TRIES := 10
@@ -499,7 +499,12 @@ func _make_mesh(spec: Dictionary) -> Dictionary:
 			mesh = capsule
 		_:
 			return {"error": "неизвестный примитив «%s» (box, plane, sphere, cylinder, capsule)" % primitive}
-	if spec.has("color"):
+	if spec.has("shader"):
+		var shader_material := _make_shader_material(spec)
+		if shader_material.has("error"):
+			return shader_material
+		mesh.material = shader_material["value"]
+	elif spec.has("color"):
 		var color := _to_color(spec["color"])
 		if color.has("error"):
 			return color
@@ -573,7 +578,10 @@ func _make_environment(spec: Dictionary) -> Dictionary:
 	return {"value": env}
 
 
+## Материал: {"color": цвет} — обычный, или {"shader": "res://….gdshader", "params": {…}} — с шейдером.
 func _make_material(spec: Dictionary) -> Dictionary:
+	if spec.has("shader"):
+		return _make_shader_material(spec)
 	var material := StandardMaterial3D.new()
 	if spec.has("color"):
 		var color := _to_color(spec["color"])
@@ -581,6 +589,42 @@ func _make_material(spec: Dictionary) -> Dictionary:
 			return color
 		material.albedo_color = color["value"]
 	return {"value": material}
+
+
+## Материал с шейдером из файла: {"shader": "res://game/grid.gdshader", "params": {"cell": 4, "line_color": "#ffffff"}}.
+## Цвет в params задаётся как "#rrggbb", списки из 2–3 чисел становятся Vector2/Vector3.
+func _make_shader_material(spec: Dictionary) -> Dictionary:
+	var shader_path := str(spec["shader"])
+	var shader = load(shader_path) if shader_path.begins_with("res://") else null
+	if shader == null or not (shader is Shader):
+		return {"error": "шейдер «%s» не найден (ожидается путь res://….gdshader)" % shader_path}
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	var params = spec.get("params", {})
+	if typeof(params) != TYPE_DICTIONARY:
+		return {"error": "params шейдера: ожидается объект {имя: значение}"}
+	for key in params:
+		var value = params[key]
+		if typeof(value) == TYPE_STRING and str(value).begins_with("#"):
+			var color := _to_color(value)
+			if color.has("error"):
+				return {"error": "%s: %s" % [key, color["error"]]}
+			value = color["value"]
+		elif _is_number_array(value, 3):
+			value = Vector3(value[0], value[1], value[2])
+		elif _is_number_array(value, 2):
+			value = Vector2(value[0], value[1])
+		material.set_shader_parameter(key, value)
+	return {"value": material}
+
+
+func _describe_material(material: Material) -> Variant:
+	if material is StandardMaterial3D:
+		return {"material": "StandardMaterial3D", "color": _to_json(material.albedo_color)}
+	if material is ShaderMaterial:
+		var shader: Shader = material.shader
+		return {"material": "ShaderMaterial", "shader": shader.resource_path if shader != null else null}
+	return material.get_class() if material != null else null
 
 
 ## Значение свойства в виде, пригодном для JSON.
@@ -606,8 +650,8 @@ func _to_json(value: Variant) -> Variant:
 			if value is Environment:
 				return {"environment": "Environment", "sky": value.sky != null,
 					"ambient_energy": value.ambient_light_energy, "fog": value.fog_enabled}
-			if value is StandardMaterial3D:
-				return {"material": "StandardMaterial3D", "color": _to_json(value.albedo_color)}
+			if value is Material:
+				return _describe_material(value)
 			return value.get_class()
 		TYPE_NIL, TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_ARRAY, TYPE_DICTIONARY:
 			return value
@@ -891,6 +935,8 @@ func _describe_mesh(mesh: PrimitiveMesh) -> Dictionary:
 		info["height"] = mesh.height
 	if mesh.material is StandardMaterial3D:
 		info["color"] = _to_json(mesh.material.albedo_color)
+	elif mesh.material is ShaderMaterial:
+		info["material"] = _describe_material(mesh.material)
 	return info
 
 

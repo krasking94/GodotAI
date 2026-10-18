@@ -126,6 +126,14 @@ def game_run(project: Path, options) -> dict:
         cmd.append("--headless")
     if options.scene:
         cmd.append(options.scene)
+    if options.test:
+        # Всё после «--» Godot отдаёт скриптам как пользовательские аргументы (OS.get_cmdline_user_args).
+        cmd.append("--")
+        for item in options.test:
+            who, sep, program = item.partition("=")
+            if not sep or not who.strip() or not program.strip():
+                return fail(f"--test ждёт вид КТО=ПРОГРАММА, например player=forward:1.5,enter:0.5 (получено: {item!r})")
+            cmd.append(f"--test-{who.strip()}={program.strip()}")
     (project / STATE_DIR).mkdir(parents=True, exist_ok=True)
     log_path = project / RUN_LOG
     started = time.time()
@@ -333,6 +341,9 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--seconds", type=float, default=8, help="сколько секунд дать игре поработать, потом остановить (по умолчанию 8)")
     run.add_argument("--background", action="store_true", help="запустить и сразу вернуться, не останавливая игру")
     run.add_argument("--headless", action="store_true", help="без окна (для автоматических проверок)")
+    run.add_argument("--test", action="append", default=[], metavar="КТО=ПРОГРАММА",
+                     help="программа самопроверки для скрипта игры, например player=forward:1.5,enter:0.5,wait:2,exit:0.5 "
+                          "или car=gas:2,brake:1 (можно указать несколько раз); скрипт печатает результат фаз в лог")
     run.add_argument("--godot", help="путь к исполняемому файлу Godot, если редактор закрыт")
     game_sub.add_parser("stop", help="остановить запущенную игру")
     game_sub.add_parser("status", help="запущена ли игра и что было в последнем запуске")

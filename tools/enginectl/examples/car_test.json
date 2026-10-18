@@ -1,5 +1,5 @@
 {
-  "phrase": "Сделай большую ровную площадку под небом и поставь на неё красную машину с четырьмя колёсами, на которой можно ездить: газ, руль, тормоз. Камера едет следом за машиной и не наклоняется",
+  "phrase": "Сделай большую площадку с клетчатой разметкой, столбиками и домами-ориентирами по краям и машину с фарами, которой можно управлять, с камерой сзади",
   "scene": {
     "path": "res://scenes/car_test.tscn",
     "root_type": "Node3D",
@@ -24,7 +24,14 @@
             400,
             400
           ],
-          "color": "#8a8a80"
+          "shader": "res://game/grid.gdshader",
+          "params": {
+            "cell": 4,
+            "color_a": "#56564f",
+            "color_b": "#7d7d76",
+            "line_color": "#e9e9df",
+            "line_width": 0.12
+          }
         }
       }
     },
@@ -85,6 +92,570 @@
     {
       "op": "create",
       "parent": ".",
+      "name": "HouseNorth",
+      "type": "StaticBody3D",
+      "props": {
+        "position": [
+          0,
+          4,
+          -90
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "HouseNorth",
+      "name": "Mesh",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "box",
+          "size": [
+            20,
+            8,
+            10
+          ],
+          "color": "#d9a066"
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": "HouseNorth",
+      "name": "Shape",
+      "type": "CollisionShape3D",
+      "props": {
+        "shape": {
+          "primitive": "box",
+          "size": [
+            20,
+            8,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "HouseSouth",
+      "type": "StaticBody3D",
+      "props": {
+        "position": [
+          0,
+          4,
+          90
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "HouseSouth",
+      "name": "Mesh",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "box",
+          "size": [
+            20,
+            8,
+            10
+          ],
+          "color": "#6fa8dc"
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": "HouseSouth",
+      "name": "Shape",
+      "type": "CollisionShape3D",
+      "props": {
+        "shape": {
+          "primitive": "box",
+          "size": [
+            20,
+            8,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "HouseEast",
+      "type": "StaticBody3D",
+      "props": {
+        "position": [
+          90,
+          4,
+          0
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "HouseEast",
+      "name": "Mesh",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "box",
+          "size": [
+            10,
+            8,
+            20
+          ],
+          "color": "#93c47d"
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": "HouseEast",
+      "name": "Shape",
+      "type": "CollisionShape3D",
+      "props": {
+        "shape": {
+          "primitive": "box",
+          "size": [
+            10,
+            8,
+            20
+          ]
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "HouseWest",
+      "type": "StaticBody3D",
+      "props": {
+        "position": [
+          -90,
+          4,
+          0
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "HouseWest",
+      "name": "Mesh",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "box",
+          "size": [
+            10,
+            8,
+            20
+          ],
+          "color": "#e06666"
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": "HouseWest",
+      "name": "Shape",
+      "type": "CollisionShape3D",
+      "props": {
+        "shape": {
+          "primitive": "box",
+          "size": [
+            10,
+            8,
+            20
+          ]
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleL1",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          5,
+          0.6,
+          8
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleR1",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          -5,
+          0.6,
+          8
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleL2",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          5,
+          0.6,
+          16
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleR2",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          -5,
+          0.6,
+          16
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleL3",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          5,
+          0.6,
+          24
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleR3",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          -5,
+          0.6,
+          24
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleL4",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          5,
+          0.6,
+          32
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleR4",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          -5,
+          0.6,
+          32
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleL5",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          5,
+          0.6,
+          40
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleR5",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          -5,
+          0.6,
+          40
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleL6",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          5,
+          0.6,
+          48
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleR6",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          -5,
+          0.6,
+          48
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleL7",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          5,
+          0.6,
+          56
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleR7",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          -5,
+          0.6,
+          56
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleL8",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          5,
+          0.6,
+          64
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleR8",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          -5,
+          0.6,
+          64
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleL9",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          5,
+          0.6,
+          72
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleR9",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          -5,
+          0.6,
+          72
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleL10",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          5,
+          0.6,
+          80
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PoleR10",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "cylinder",
+          "radius": 0.2,
+          "height": 1.2,
+          "color": "#ff7a00"
+        },
+        "position": [
+          -5,
+          0.6,
+          80
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
       "name": "Car",
       "type": "VehicleBody3D",
       "props": {
@@ -100,8 +671,7 @@
           -0.35,
           0
         ],
-        "script": "res://game/car.gd",
-        "test_program": "gas:2,left:1,brake:1"
+        "script": "res://game/car.gd"
       }
     },
     {
@@ -158,14 +728,102 @@
           "size": [
             1.5,
             0.5,
-            1.8
+            1.6
           ],
           "color": "#6d7b8d"
         },
         "position": [
           0,
           0.85,
-          -0.3
+          0.5
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Car",
+      "name": "HeadlightL",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "box",
+          "size": [
+            0.35,
+            0.18,
+            0.08
+          ],
+          "color": "#fff4b0"
+        },
+        "position": [
+          0.6,
+          0.45,
+          2.02
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Car",
+      "name": "HeadlightR",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "box",
+          "size": [
+            0.35,
+            0.18,
+            0.08
+          ],
+          "color": "#fff4b0"
+        },
+        "position": [
+          -0.6,
+          0.45,
+          2.02
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Car",
+      "name": "TailLightL",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "box",
+          "size": [
+            0.35,
+            0.18,
+            0.08
+          ],
+          "color": "#ff2020"
+        },
+        "position": [
+          0.6,
+          0.45,
+          -2.02
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Car",
+      "name": "TailLightR",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "box",
+          "size": [
+            0.35,
+            0.18,
+            0.08
+          ],
+          "color": "#ff2020"
+        },
+        "position": [
+          -0.6,
+          0.45,
+          -2.02
         ]
       }
     },
