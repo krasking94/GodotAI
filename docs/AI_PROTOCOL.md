@@ -40,9 +40,10 @@
 - `"res://путь"` → загружается ресурс (меш, материал, сцена).
 - `mesh`: `{"primitive": "box"|"plane"|"sphere"|"cylinder"|"capsule", "size": [...], "radius": r, "height": h, "color": ...}`.
 - `material_override`: `{"color": ...}` → StandardMaterial3D.
+- `shape` (у CollisionShape3D): `{"primitive": "box"|"sphere"|"capsule"|"cylinder", "size": [x, y, z], "radius": r, "height": h}` → BoxShape3D, SphereShape3D, CapsuleShape3D, CylinderShape3D. Физика в Godot: видимый меш и невидимая форма столкновения — разные узлы, поэтому пол делается как StaticBody3D с детьми MeshInstance3D и CollisionShape3D, персонаж — CharacterBody3D с CollisionShape3D и Camera3D (пример: `examples/yard.json`).
 
 В `plan` для мешей показываются тип, размер и цвет (`{"mesh": "BoxMesh", "size": [...], "color": [...]}`).
 
-Примеры описаний: `tools/enginectl/examples/yard.json` (двор: пол, две стены, свет), `room.json` (комната: пол 8×8, четыре стены, лампа, камера, скрипт). В каждом записана фраза человека (`phrase`), блок `scene` и `ops`; `scene apply` берёт из файла только `ops`, `scene build` — всё.
+Примеры описаний: `tools/enginectl/examples/yard.json` (двор с физикой: пол, две стены, свет, персонаж), `room.json` (комната: пол 8×8, четыре стены, лампа, камера, скрипт). В каждом записана фраза человека (`phrase`), блок `scene` и `ops`; `scene apply` берёт из файла только `ops`, `scene build` — всё.
 
 Папка `tools/` помечена файлом `.gdignore`: редактор её не сканирует и не компилирует, поэтому учебный сломанный скрипт лежит там как `examples/yard_broken.gd.txt`.
