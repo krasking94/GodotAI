@@ -2,7 +2,7 @@ extends VehicleBody3D
 
 ## Машина на упрощённой физике Godot (VehicleBody3D: кузов + четыре VehicleWheel3D).
 ## Управление, пока active: W/S (или стрелки) — газ и задний ход, A/D — руль,
-## пробел — тормоз, R — поставить на колёса, если перевернулась. Пока active выключен
+## пробел — тормоз, R — поставить на колёса, если перевернулась (одно нажатие, только когда лежит). Пока active выключен
 ## (водителя нет), машина стоит на ручнике; персонаж включает active, садясь в неё (клавиша E).
 ## S на ходу сначала тормозит, и только когда машина почти остановилась, включает задний ход.
 ## Руль на скорости становится мягче, а выше MAX_SPEED мотор не разгоняет: так машина не переворачивается.
@@ -30,6 +30,7 @@ var _phase_time := 0.0
 var _phase_start_pos := Vector3.ZERO
 var _phase_start_yaw := 0.0
 var _speed_label: Label  # спидометр в углу экрана, виден пока active
+var _r_was_down := false  # чтобы R срабатывала по нажатию, а не пока зажата
 
 
 func _ready() -> void:
@@ -85,7 +86,7 @@ func _physics_process(delta: float) -> void:
 			"flip":  # проверка клавиши R: положить на бок и поставить обратно
 				if _phase_time == 0.0:
 					global_transform.basis = Basis(Vector3.BACK, PI * 0.6)
-				elif _phase_time > 0.5 and global_transform.basis.y.dot(Vector3.UP) < 0.5:
+				elif _phase_time > 0.5 and is_flipped():
 					flip_upright()
 		_phase_time += delta
 		if _phase_time >= _phases[_phase_index]["seconds"]:
@@ -106,8 +107,15 @@ func _physics_process(delta: float) -> void:
 			steer_input -= 1.0
 		if Input.is_physical_key_pressed(KEY_SPACE):
 			braking = true
-		if Input.is_physical_key_pressed(KEY_R):
-			flip_upright()
+		# R срабатывает один раз за нажатие (а не каждый кадр, пока зажата) и только если машина
+		# действительно лежит на боку или на крыше: иначе каждый кадр подбрасывал бы её на полметра.
+		var r_down := Input.is_physical_key_pressed(KEY_R)
+		if r_down and not _r_was_down:
+			if is_flipped():
+				flip_upright()
+			else:
+				print("Машина и так на колёсах, R не нужна")
+		_r_was_down = r_down
 	else:
 		braking = true  # без водителя машина стоит на ручнике
 
@@ -123,6 +131,11 @@ func _physics_process(delta: float) -> void:
 	_speed_label.visible = active
 	if active:
 		_speed_label.text = "%d км/ч" % roundi(absf(forward_speed) * 3.6)
+
+
+## Лежит ли машина на боку или на крыше (верх кузова отклонён от вертикали больше ~45°).
+func is_flipped() -> bool:
+	return global_transform.basis.y.dot(Vector3.UP) < 0.7
 
 
 ## Ставит машину на колёса на том же месте (после переворота).
