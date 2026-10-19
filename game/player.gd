@@ -12,7 +12,8 @@ extends CharacterBody3D
 ## что персонаж не провалился.
 ## Самопроверка: test_program = "goto:4:2.5;2,interact:0.3,forward:1,enter:0.5,wait:3,exit:0.5"
 ## (фаза = имя:секунды[:аргументы]; goto идёт к точке x;z не дольше заданных секунд, interact/enter
-## нажимают E, exit выходит из машины, forward идёт вперёд, wait ждёт), после каждой фазы в логе «Персонаж [фаза]: …».
+## нажимают E, exit выходит из машины, forward идёт вперёд, wait ждёт, save/load/corrupt зовут узел
+## сохранений), после каждой фазы в логе «Персонаж [фаза]: …».
 
 const SPEED := 4.0
 const RUN_SPEED := 8.0  # с зажатым Shift
@@ -192,16 +193,21 @@ func exit_car() -> bool:
 	if spot.is_empty():
 		print("Выйти нельзя: вокруг машины нет свободного места (проверены левая и правая двери, зад и перёд)")
 		return false
+	var car_name: String = _car.name
+	_leave_car()
+	_teleport(spot["position"], spot["yaw"])
+	print("Персонаж вышел из машины «%s» %s" % [car_name, spot["name"]])
+	return true
+
+
+## Покидает машину без поиска места (положение задаёт вызывающий): общая часть выхода и загрузки.
+func _leave_car() -> void:
 	if "active" in _car:
 		_car.active = false
-	var car_name: String = _car.name
 	_car = null
-	_teleport(spot["position"], spot["yaw"])
 	camera.rotation.x = 0.0
 	visible = true
 	camera.current = true
-	print("Персонаж вышел из машины «%s» %s" % [car_name, spot["name"]])
-	return true
 
 
 ## Переносит персонажа в точку. Столкновения на два кадра физики выключены: иначе движок считает,
@@ -258,18 +264,24 @@ func _find_exit_spot(car: Node3D) -> Dictionary:
 
 func save_state() -> Dictionary:
 	return {"position": [global_position.x, global_position.y, global_position.z],
-		"yaw": rotation.y, "inventory": inventory.duplicate()}
+		"yaw": rotation.y, "inventory": inventory.duplicate(), "car": _car.name if _car != null else ""}
 
 
 func load_state(state: Dictionary) -> void:
-	if _car != null:
-		exit_car()
-	var p = state.get("position", null)
-	var target := Vector3(p[0], p[1], p[2]) if p is Array and p.size() == 3 else global_position
-	_teleport(target, float(state.get("yaw", rotation.y)))
 	inventory.clear()
 	for item in state.get("inventory", []):
 		inventory.append(str(item))
+	var car_name := str(state.get("car", ""))
+	if _car != null:
+		_leave_car()
+	if car_name != "":
+		for car in get_tree().get_nodes_in_group("cars"):
+			if car.name == car_name:
+				enter_car(car)
+				return
+	var p = state.get("position", null)
+	var target := Vector3(p[0], p[1], p[2]) if p is Array and p.size() == 3 else global_position
+	_teleport(target, float(state.get("yaw", rotation.y)))
 
 
 # --- Самопроверка ----------------------------------------------------------------
@@ -299,6 +311,16 @@ func _test_input(delta: float) -> Vector2:
 				interact_nearest()
 			"exit":
 				exit_car()
+			"save", "load", "corrupt":
+				var manager := get_tree().get_first_node_in_group("save_manager")
+				if manager == null:
+					print("Персонаж: в сцене нет узла сохранений (SaveManager)")
+				elif phase["name"] == "save":
+					manager.save_game()
+				elif phase["name"] == "load":
+					manager.load_game()
+				else:
+					manager.corrupt_save_for_test()
 	match phase["name"]:
 		"forward":
 			input.y = -1.0
