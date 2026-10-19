@@ -5,7 +5,7 @@ extends EditorPlugin
 ## Запрос: {"token": "...", "command": "doctor", "args": {}}
 ## Ответ:  {"status": "ok"|"error", "result": {...}, "errors": [], "warnings": [], "files": []}
 
-const PLUGIN_VERSION := "0.9.2"
+const PLUGIN_VERSION := "0.10.0"
 ## Флаги, при которых Godot запускает редактор лишь на время разовой задачи (сборка, импорт, проверка).
 const BATCH_FLAGS := ["--export-debug", "--export-release", "--export-pack", "--export-patch", "--import",
 	"--quit", "--quit-after", "--doctool", "--check-only", "--convert-3to4", "--validate-conversion-3to4"]
@@ -47,6 +47,8 @@ func _enter_tree() -> void:
 		push_error("AI Bridge: не удалось открыть порт %d..%d" % [DEFAULT_PORT, DEFAULT_PORT + PORT_TRIES - 1])
 		return
 	_write_connection_file()
+	_journal_load()
+	_build_dock()
 	print("AI Bridge %s: слушаю %s:%d" % [PLUGIN_VERSION, HOST, _port])
 	if SELFTEST_FLAG in OS.get_cmdline_user_args():
 		_selftest.stage = 1
@@ -57,6 +59,10 @@ func _exit_tree() -> void:
 		c.peer.disconnect_from_host()
 	_clients.clear()
 	_server.stop()
+	if _dock != null:
+		remove_control_from_docks(_dock)
+		_dock.queue_free()
+		_dock = null
 	# Удаляем только свой файл подключения: чужой (другого редактора) не трогаем.
 	if _port != 0 and _connection_file_pid() == OS.get_process_id():
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(STATE_DIR + "/connection.json"))
@@ -177,9 +183,33 @@ func _handle_line(line: String) -> Dictionary:
 	var args = request.get("args", {})
 	if typeof(args) != TYPE_DICTIONARY:
 		return _error("Поле args должно быть объектом")
-	match str(request.get("command", "")):
+	var command := str(request.get("command", ""))
+	var before := _before_command(command, args)  # что было до команды, чтобы задача могла её отменить
+	var response := _dispatch(command, args)
+	_record(command, args, response, before)
+	return response
+
+
+func _dispatch(command: String, args: Dictionary) -> Dictionary:
+	match command:
 		"doctor":
 			return _ok(_doctor())
+		"task.begin":
+			return _task_begin(args)
+		"task.end":
+			return _task_end(args)
+		"task.list":
+			return _task_list(args)
+		"task.undo":
+			return _task_undo(args)
+		"journal.get":
+			return _journal_get(args)
+		"journal.clear":
+			return _journal_clear()
+		"journal.add":
+			return _journal_add(args)
+		"editor.screenshot":
+			return _editor_screenshot(args)
 		"scene.inspect":
 			return _scene_inspect(args)
 		"scene.apply":
@@ -272,7 +302,8 @@ func _scene_apply(args: Dictionary) -> Dictionary:
 
 	# Этап 2: применение одним действием Undo/Redo.
 	var ur := get_undo_redo()
-	ur.create_action("%s (%d)" % [UNDO_LABEL, steps.size()], UndoRedo.MERGE_DISABLE, root)
+	# Номер записи журнала в имени действия: так task.undo отличает это действие от других таких же.
+	ur.create_action("%s (%d) #%d" % [UNDO_LABEL, steps.size(), _next_id], UndoRedo.MERGE_DISABLE, root)
 	for step in steps:
 		match step["kind"]:
 			"create":
@@ -1065,12 +1096,13 @@ func _script_set(args: Dictionary) -> Dictionary:
 		result["parse_error"] = "скрипт не компилируется (%s), подробности в выводе редактора и в enginectl game run" % error_string(reload_err)
 	if node != null:
 		var ur := get_undo_redo()
-		ur.create_action("AI Bridge: script set %s" % node.name, UndoRedo.MERGE_DISABLE, root)
+		ur.create_action("AI Bridge: script set %s #%d" % [node.name, _next_id], UndoRedo.MERGE_DISABLE, root)
 		ur.add_do_property(node, "script", script)
 		ur.add_undo_property(node, "script", node.get_script())
 		ur.commit_action()
 		EditorInterface.mark_scene_as_unsaved()
 		result["attached_to"] = node_path
+		result["attached_name"] = node.name
 	var response := _ok(result)
 	response["files"] = [path]
 	if result.has("parse_error"):
@@ -1305,3 +1337,635 @@ func _count_nodes(node: Node) -> int:
 	for child in node.get_children():
 		count += _count_nodes(child)
 	return count
+
+
+# ---------------------------------------------------------------------------
+# Журнал и задачи ИИ: что делает агент, план, изменённые файлы, ошибки, отмена.
+# Каждая команда от enginectl записывается в журнал (.godot/ai_bridge/journal.json);
+# task.begin / task.end группируют команды в задачу с заголовком и планом;
+# task.undo отменяет задачу по записям (история сцены, файлы, скрипты, настройка).
+# Панель «Задачи ИИ» в редакторе показывает всё это и даёт кнопку отмены.
+# ---------------------------------------------------------------------------
+
+const JOURNAL_FILE := STATE_DIR + "/journal.json"
+const TRASH_DIR := STATE_DIR + "/trash"
+const JOURNAL_KEEP := 300   # записей в журнале (старые уходят)
+const TASKS_KEEP := 50
+## Команды, которые в журнал не пишутся: служебные и чтение журнала.
+const SILENT_COMMANDS := ["doctor", "scene.inspect", "task.begin", "task.end", "task.list", "task.undo",
+	"journal.get", "journal.clear", "journal.add", "editor.screenshot"]
+
+var _journal: Array = []     # {id, time, command, status, summary, files, errors, task, undo, undone}
+var _tasks: Array = []       # {id, title, plan, started, finished, status, note, entries}
+var _next_id := 1
+var _current_task := 0       # id идущей задачи или 0
+var _dock: VBoxContainer = null
+var _dock_status: Label
+var _dock_task: Label
+var _dock_plan: RichTextLabel
+var _dock_tree: Tree
+var _dock_details: RichTextLabel
+var _dock_undo_button: Button
+
+
+# --- Журнал ----------------------------------------------------------------
+
+func _journal_load() -> void:
+	_journal = []
+	_tasks = []
+	if not FileAccess.file_exists(JOURNAL_FILE):
+		return
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(JOURNAL_FILE))
+	if parsed is Dictionary:
+		_journal = parsed.get("journal", []) if parsed.get("journal") is Array else []
+		_tasks = parsed.get("tasks", []) if parsed.get("tasks") is Array else []
+		_next_id = int(parsed.get("next_id", 1))
+		_current_task = int(parsed.get("current_task", 0))
+
+
+func _journal_save() -> void:
+	if _journal.size() > JOURNAL_KEEP:
+		_journal = _journal.slice(_journal.size() - JOURNAL_KEEP)
+	if _tasks.size() > TASKS_KEEP:
+		_tasks = _tasks.slice(_tasks.size() - TASKS_KEEP)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(STATE_DIR))
+	var file := FileAccess.open(JOURNAL_FILE, FileAccess.WRITE)
+	if file != null:
+		file.store_string(JSON.stringify({"journal": _journal, "tasks": _tasks, "next_id": _next_id,
+			"current_task": _current_task}, "\t"))
+	_dock_refresh()
+
+
+## Снимок состояния до команды: нужен, чтобы task.undo вернул всё как было.
+func _before_command(command: String, args: Dictionary) -> Dictionary:
+	match command:
+		"script.set":
+			var path := str(args.get("path", ""))
+			if path.begins_with("res://") and FileAccess.file_exists(path):
+				return {"previous": FileAccess.get_file_as_string(path)}
+			return {"previous": null}
+		"project.main_scene":
+			return {"previous": str(ProjectSettings.get_setting("application/run/main_scene", ""))}
+	return {}
+
+
+## Записывает выполненную команду в журнал (и в текущую задачу, если она идёт).
+func _record(command: String, args: Dictionary, response: Dictionary, before: Dictionary) -> void:
+	if command in SILENT_COMMANDS:
+		return
+	var result: Dictionary = response.get("result", {}) if response.get("result") is Dictionary else {}
+	var entry := {"id": _next_id, "time": Time.get_datetime_string_from_system(false, true), "command": command,
+		"status": str(response.get("status", "error")), "summary": _summarize(command, args, result, response),
+		"files": response.get("files", []), "errors": response.get("errors", []), "task": _current_task,
+		"undo": _undo_info(command, args, result, before), "undone": false}
+	_next_id += 1
+	_journal.append(entry)
+	if _current_task != 0:
+		var task := _find_task(_current_task)
+		if not task.is_empty():
+			task["entries"].append(entry["id"])
+			if entry["status"] != "ok":
+				task["errors"] = int(task.get("errors", 0)) + 1
+	_journal_save()
+
+
+## Одна строка о команде для панели: что сделано и где.
+func _summarize(command: String, args: Dictionary, result: Dictionary, response: Dictionary) -> String:
+	var where := str(args.get("path", args.get("scene", "")))
+	var text := ""
+	match command:
+		"scene.apply":
+			var count: int = result.get("plan", []).size() if result.get("plan") is Array else 0
+			text = "%s: %d операций в %s" % ["план (dry run)" if result.get("dry_run", false) else "изменена сцена",
+				count, str(result.get("scene_path", ""))]
+		"scene.build":
+			var count: int = result.get("plan", []).size() if result.get("plan") is Array else 0
+			text = "собрана сцена %s: %d операций" % [str(result.get("scene_path", where)), count]
+		"scene.new":
+			text = "новая сцена %s" % str(result.get("scene_path", where))
+		"scene.open":
+			text = "открыта сцена %s" % where
+		"scene.save":
+			text = "сохранена сцена %s" % str(result.get("scene_path", ""))
+		"scene.inspect":
+			text = "прочитано дерево сцены (%d узлов)" % int(result.get("node_count", 0))
+		"scene.undo":
+			text = "отменено: %s" % str(result.get("undone", ""))
+		"scene.redo":
+			text = "повторено: %s" % str(result.get("redone", ""))
+		"script.set":
+			text = "%s скрипт %s" % ["создан" if result.get("created", false) else "обновлён", where]
+			if result.has("attached_to"):
+				text += ", повешен на %s" % str(result["attached_to"])
+		"project.main_scene":
+			text = "главная сцена: %s" % where
+		"project.refresh":
+			text = "проект перечитан с диска"
+		_:
+			text = command
+	if response.get("status", "") != "ok":
+		var errors: Array = response.get("errors", [])
+		text = "ОШИБКА %s: %s" % [command, str(errors[0]) if errors.size() > 0 else "?"]
+	return text
+
+
+## Как отменить эту запись: {"kind": "history"|"script"|"file"|"setting", ...} или {} если нечего.
+func _undo_info(command: String, args: Dictionary, result: Dictionary, before: Dictionary) -> Dictionary:
+	match command:
+		"scene.apply":
+			if result.get("applied", false):
+				var count: int = result.get("plan", []).size() if result.get("plan") is Array else 0
+				return {"kind": "history", "scene": str(result.get("scene_path", "")),
+					"action": "%s (%d) #%d" % [UNDO_LABEL, count, _next_id]}
+		"script.set":
+			if result.has("path"):
+				var info := {"kind": "script", "path": str(result["path"]), "previous": before.get("previous")}
+				if result.has("attached_to"):
+					info["action"] = "AI Bridge: script set %s #%d" % [str(result.get("attached_name", "")), _next_id]
+				return info
+		"scene.build":
+			if result.has("scene_path"):
+				return {"kind": "file", "path": str(result["scene_path"]), "backup": str(result.get("backup", ""))}
+		"scene.new":
+			if result.has("scene_path"):
+				return {"kind": "file", "path": str(result["scene_path"]), "backup": ""}
+		"project.main_scene":
+			if result.has("path") or result.has("main_scene"):
+				return {"kind": "setting", "previous": str(before.get("previous", ""))}
+	return {}
+
+
+func _journal_get(args: Dictionary) -> Dictionary:
+	var limit := int(args.get("limit", 50))
+	var entries := _journal.slice(maxi(_journal.size() - limit, 0)) if limit > 0 else _journal.duplicate()
+	return _ok({"entries": entries, "total": _journal.size(), "current_task": _current_task,
+		"journal_path": JOURNAL_FILE})
+
+
+func _journal_clear() -> Dictionary:
+	var count := _journal.size()
+	_journal = []
+	_tasks = []
+	_current_task = 0
+	_journal_save()
+	return _ok({"cleared": count})
+
+
+## Запись от enginectl о команде, которую выполняет он сам (game run, screenshot, export).
+func _journal_add(args: Dictionary) -> Dictionary:
+	var command := str(args.get("command", ""))
+	if command == "":
+		return _error("Поле command пустое")
+	var fake := {"status": str(args.get("status", "ok")), "result": {}, "errors": args.get("errors", []),
+		"files": args.get("files", [])}
+	var entry := {"id": _next_id, "time": Time.get_datetime_string_from_system(false, true), "command": command,
+		"status": fake["status"], "summary": str(args.get("summary", command)), "files": fake["files"],
+		"errors": fake["errors"], "task": _current_task, "undo": {}, "undone": false}
+	_next_id += 1
+	_journal.append(entry)
+	if _current_task != 0:
+		var task := _find_task(_current_task)
+		if not task.is_empty():
+			task["entries"].append(entry["id"])
+			if entry["status"] != "ok":
+				task["errors"] = int(task.get("errors", 0)) + 1
+	_journal_save()
+	return _ok({"id": entry["id"]})
+
+
+# --- Задачи ----------------------------------------------------------------
+
+func _find_task(id: int) -> Dictionary:
+	for task in _tasks:
+		if int(task.get("id", 0)) == id:
+			return task
+	return {}
+
+
+func _find_entry(id: int) -> Dictionary:
+	for entry in _journal:
+		if int(entry.get("id", 0)) == id:
+			return entry
+	return {}
+
+
+## task.begin: {"title": "Строю комнату", "plan": ["пол", "стены", "лампа"]}. Прежняя незаконченная задача закрывается.
+func _task_begin(args: Dictionary) -> Dictionary:
+	var title := str(args.get("title", "")).strip_edges()
+	if title == "":
+		return _error("Поле title пустое: скажите, что делает ИИ, например «Строю комнату»")
+	var plan: Array = []
+	if args.get("plan") is Array:
+		for step in args["plan"]:
+			plan.append(str(step))
+	elif args.get("plan") is String and str(args["plan"]) != "":
+		plan = [str(args["plan"])]
+	if _current_task != 0:
+		var old := _find_task(_current_task)
+		if not old.is_empty() and old.get("finished", "") == "":
+			old["finished"] = Time.get_datetime_string_from_system(false, true)
+			old["status"] = "прервана"
+			old["note"] = "началась новая задача «%s»" % title
+	var task := {"id": _next_id, "title": title, "plan": plan, "started": Time.get_datetime_string_from_system(false, true),
+		"finished": "", "status": "идёт", "note": "", "entries": [], "errors": 0}
+	_next_id += 1
+	_tasks.append(task)
+	_current_task = task["id"]
+	_journal_save()
+	_dock_show()
+	return _ok({"task_id": task["id"], "title": title, "plan": plan})
+
+
+## task.end: {"status": "ok"|"error", "note": "..."}; без status берётся по ошибкам в записях.
+func _task_end(args: Dictionary) -> Dictionary:
+	if _current_task == 0:
+		return _error("Сейчас нет идущей задачи (task.begin не вызывался)")
+	var task := _find_task(_current_task)
+	if task.is_empty():
+		_current_task = 0
+		_journal_save()
+		return _error("Идущая задача не найдена в журнале")
+	var status := str(args.get("status", ""))
+	if status == "":
+		status = "ошибка" if int(task.get("errors", 0)) > 0 else "готово"
+	elif status == "ok":
+		status = "готово"
+	elif status == "error":
+		status = "ошибка"
+	task["status"] = status
+	task["note"] = str(args.get("note", ""))
+	task["finished"] = Time.get_datetime_string_from_system(false, true)
+	_current_task = 0
+	_journal_save()
+	return _ok({"task_id": task["id"], "title": task["title"], "status": status, "entries": task["entries"].size(),
+		"errors": int(task.get("errors", 0)), "files": _task_files(task)})
+
+
+func _task_files(task: Dictionary) -> Array:
+	var files: Array = []
+	for id in task.get("entries", []):
+		for f in _find_entry(int(id)).get("files", []):
+			if not files.has(f):
+				files.append(f)
+	return files
+
+
+func _task_list(args: Dictionary) -> Dictionary:
+	var limit := int(args.get("limit", 20))
+	var tasks := _tasks.slice(maxi(_tasks.size() - limit, 0)) if limit > 0 else _tasks.duplicate()
+	var out: Array = []
+	for task in tasks:
+		var item: Dictionary = task.duplicate()
+		item["files"] = _task_files(task)
+		var entries: Array = []
+		for id in task.get("entries", []):
+			var entry := _find_entry(int(id))
+			if not entry.is_empty():
+				entries.append({"id": entry["id"], "time": entry["time"], "command": entry["command"],
+					"status": entry["status"], "summary": entry["summary"], "undone": entry.get("undone", false)})
+		item["entries"] = entries
+		out.append(item)
+	return _ok({"tasks": out, "current_task": _current_task})
+
+
+## task.undo: {"id": N} — отменяет записи задачи в обратном порядке. Без id берётся последняя задача.
+## История сцены отматывается только если сверху лежит именно действие ИИ (иначе ручные правки
+## пострадали бы); файлы переезжают в .godot/ai_bridge/trash, скрипты получают прежний текст.
+func _task_undo(args: Dictionary) -> Dictionary:
+	var id := int(args.get("id", 0))
+	var task: Dictionary
+	if id == 0:
+		if _tasks.is_empty():
+			return _error("Задач ещё не было")
+		task = _tasks[_tasks.size() - 1]
+	else:
+		task = _find_task(id)
+		if task.is_empty():
+			return _error("Задача %d не найдена" % id)
+	var undone: Array = []
+	var skipped: Array = []
+	var ids: Array = task.get("entries", []).duplicate()
+	ids.reverse()
+	for entry_id in ids:
+		var entry := _find_entry(int(entry_id))
+		if entry.is_empty() or entry.get("undone", false):
+			continue
+		var info: Dictionary = entry.get("undo", {})
+		if info.is_empty():
+			continue
+		var outcome := _undo_entry(info)
+		if outcome == "":
+			entry["undone"] = true
+			undone.append(entry["summary"])
+		else:
+			skipped.append("%s — %s" % [entry["summary"], outcome])
+	if undone.size() > 0:
+		task["status"] = "отменена" if skipped.is_empty() else "отменена частично"
+		if _current_task == int(task["id"]):
+			_current_task = 0
+			task["finished"] = Time.get_datetime_string_from_system(false, true)
+	EditorInterface.get_resource_filesystem().scan()
+	_journal_save()
+	if undone.is_empty() and skipped.is_empty():
+		return _error("В задаче «%s» нечего отменять" % task["title"])
+	return _ok({"task_id": task["id"], "title": task["title"], "undone": undone, "skipped": skipped,
+		"trash": TRASH_DIR if undone.size() > 0 else ""})
+
+
+## Отменяет одну запись. Возвращает "" при успехе или причину, почему нельзя.
+func _undo_entry(info: Dictionary) -> String:
+	match str(info.get("kind", "")):
+		"history":
+			return _undo_history(str(info.get("scene", "")), str(info.get("action", "")))
+		"script":
+			if info.has("action"):
+				var err := _undo_history("", str(info["action"]))  # снять скрипт с узла, если это верхнее действие
+				if err != "" and not err.begins_with("сверху"):
+					return err
+			var path := str(info.get("path", ""))
+			if info.get("previous") == null:
+				return _move_to_trash(path)
+			var file := FileAccess.open(path, FileAccess.WRITE)
+			if file == null:
+				return "не удалось записать %s" % path
+			file.store_string(str(info["previous"]))
+			file.close()
+			var script: Script = load(path)
+			if script != null:
+				_refresh_script(script)
+			return ""
+		"file":
+			var path := str(info.get("path", ""))
+			var err := _move_to_trash(path)
+			if err != "":
+				return err
+			var backup := str(info.get("backup", ""))
+			if backup != "" and FileAccess.file_exists(backup):
+				var copy_err := DirAccess.copy_absolute(ProjectSettings.globalize_path(backup), ProjectSettings.globalize_path(path))
+				if copy_err != OK:
+					return "файл убран, но прежняя копия %s не вернулась: %s" % [backup, error_string(copy_err)]
+			return ""
+		"setting":
+			ProjectSettings.set_setting("application/run/main_scene", str(info.get("previous", "")))
+			var err := ProjectSettings.save()
+			return "" if err == OK else "не удалось сохранить project.godot: %s" % error_string(err)
+	return "неизвестный вид отмены"
+
+
+## Откатывает верхнее действие в истории сцены, если это ожидаемое действие ИИ.
+func _undo_history(scene_path: String, action: String) -> String:
+	var root: Node = null
+	if scene_path == "":
+		root = EditorInterface.get_edited_scene_root()
+	else:
+		for open_root in EditorInterface.get_open_scene_roots():
+			if open_root.scene_file_path == scene_path:
+				root = open_root
+	if root == null:
+		return "сцена %s не открыта в редакторе" % scene_path
+	var ur := get_undo_redo()
+	var history := ur.get_history_undo_redo(ur.get_object_history_id(root))
+	if not history.has_undo():
+		return "история сцены пуста"
+	var top := history.get_current_action_name()
+	if top != action:
+		return "сверху в истории другое действие («%s»), отмените его сами через Ctrl+Z или оставьте" % top
+	history.undo()
+	EditorInterface.mark_scene_as_unsaved()
+	return ""
+
+
+## Переносит файл в .godot/ai_bridge/trash/<имя>.<время> (не удаляет насовсем).
+func _move_to_trash(path: String) -> String:
+	if not FileAccess.file_exists(path):
+		return "файла %s уже нет" % path
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(TRASH_DIR))
+	var stamp := int(Time.get_unix_time_from_system())
+	var target := "%s/%s.%d" % [TRASH_DIR, path.get_file(), stamp]
+	var err := DirAccess.rename_absolute(ProjectSettings.globalize_path(path), ProjectSettings.globalize_path(target))
+	if err != OK:
+		return "не удалось убрать %s: %s" % [path, error_string(err)]
+	# Редактор кладёт рядом со скриптом файл .uid (его номер в проекте); без скрипта он не нужен.
+	if FileAccess.file_exists(path + ".uid"):
+		DirAccess.rename_absolute(ProjectSettings.globalize_path(path + ".uid"),
+			ProjectSettings.globalize_path("%s/%s.uid.%d" % [TRASH_DIR, path.get_file(), stamp]))
+	return ""
+
+
+# --- Снимок окна редактора ---------------------------------------------------
+
+## editor.screenshot: {"path": "/абсолютный/путь.png"} — кадр всего окна редактора (нужен экран, не headless).
+func _editor_screenshot(args: Dictionary) -> Dictionary:
+	var path := str(args.get("path", ""))
+	if path == "":
+		return _error("Укажите path для PNG")
+	if DisplayServer.get_name() == "headless":
+		return _error("Редактор запущен без экрана (headless): снимок окна сделать негде")
+	var image := EditorInterface.get_base_control().get_viewport().get_texture().get_image()
+	if image == null or image.is_empty():
+		return _error("Не удалось получить изображение окна редактора")
+	var err := image.save_png(path)
+	if err != OK:
+		return _error("Не удалось сохранить %s: %s" % [path, error_string(err)])
+	var response := _ok({"path": path, "width": image.get_width(), "height": image.get_height()})
+	response["files"] = [path]
+	return response
+
+
+# --- Панель «Задачи ИИ» ----------------------------------------------------------
+
+func _build_dock() -> void:
+	_dock = VBoxContainer.new()
+	_dock.name = "Задачи ИИ"
+	_dock_status = Label.new()
+	_dock_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_dock.add_child(_dock_status)
+	_dock_task = Label.new()
+	_dock_task.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_dock.add_child(_dock_task)
+	_dock_plan = RichTextLabel.new()
+	_dock_plan.fit_content = true
+	_dock_plan.bbcode_enabled = true
+	_dock_plan.custom_minimum_size = Vector2(0, 24)
+	_dock_plan.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_dock.add_child(_dock_plan)
+	var buttons := HBoxContainer.new()
+	_dock_undo_button = Button.new()
+	_dock_undo_button.text = "Отменить задачу"
+	_dock_undo_button.tooltip_text = "Откатить последнюю задачу ИИ: история сцены, файлы в .godot/ai_bridge/trash, прежний текст скриптов"
+	_dock_undo_button.pressed.connect(_on_dock_undo)
+	buttons.add_child(_dock_undo_button)
+	var refresh := Button.new()
+	refresh.text = "Обновить проект"
+	refresh.tooltip_text = "Подхватить правки файлов снаружи (то же, что enginectl project refresh)"
+	refresh.pressed.connect(func(): _project_refresh({}); _dock_refresh())
+	buttons.add_child(refresh)
+	var clear := Button.new()
+	clear.text = "Очистить"
+	clear.tooltip_text = "Очистить журнал (файлы и сцены не трогает)"
+	clear.pressed.connect(func(): _journal_clear())
+	buttons.add_child(clear)
+	_dock.add_child(buttons)
+	_dock_tree = Tree.new()
+	_dock_tree.columns = 3
+	_dock_tree.column_titles_visible = true
+	_dock_tree.set_column_title(0, "Время")
+	_dock_tree.set_column_title(1, "Команда")
+	_dock_tree.set_column_title(2, "Итог")
+	_dock_tree.set_column_expand(0, false)
+	_dock_tree.set_column_custom_minimum_width(0, 84)
+	_dock_tree.set_column_expand(1, false)
+	_dock_tree.set_column_custom_minimum_width(1, 110)
+	_dock_tree.hide_root = true
+	_dock_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_dock_tree.item_selected.connect(_on_dock_item_selected)
+	_dock.add_child(_dock_tree)
+	_dock_details = RichTextLabel.new()
+	_dock_details.bbcode_enabled = true
+	_dock_details.selection_enabled = true
+	_dock_details.custom_minimum_size = Vector2(0, 120)
+	_dock_details.text = "Выберите запись, чтобы увидеть файлы и ошибки."
+	_dock.add_child(_dock_details)
+	add_control_to_dock(EditorPlugin.DOCK_SLOT_RIGHT_UL, _dock)
+	_dock_refresh()
+
+
+## Выводит вкладку «Задачи ИИ» вперёд (панель живёт в TabContainer вместе с «Сцена» и «Импорт»).
+func _dock_show() -> void:
+	if _dock == null:
+		return
+	# Между панелью и TabContainer редактор может вставлять свои обёртки: ищем ближайшую вкладку.
+	var node: Node = _dock
+	while node != null and not (node.get_parent() is TabContainer):
+		node = node.get_parent()
+	if node == null:
+		print("AI Bridge: не нашёл вкладку панели (родители: %s)" % _dock_ancestry())
+		return
+	var tabs := node.get_parent() as TabContainer
+	var index := tabs.get_tab_idx_from_control(node as Control)
+	if index >= 0:
+		tabs.current_tab = index
+
+
+func _dock_ancestry() -> String:
+	var names: PackedStringArray = []
+	var node: Node = _dock
+	while node != null and names.size() < 6:
+		names.append(node.get_class())
+		node = node.get_parent()
+	return " ← ".join(names)
+
+
+func _dock_refresh() -> void:
+	if _dock == null:
+		return
+	_dock_status.text = "ИИ на связи: порт %d · записей в журнале %d · задач %d" % [_port, _journal.size(), _tasks.size()]
+	var task: Dictionary = {}
+	if _current_task != 0:
+		task = _find_task(_current_task)
+	elif not _tasks.is_empty():
+		task = _tasks[_tasks.size() - 1]
+	if task.is_empty():
+		_dock_task.text = "Задач ещё не было. ИИ объявляет задачу командой enginectl task begin."
+		_dock_plan.text = ""
+		_dock_undo_button.disabled = true
+	else:
+		_dock_task.text = "%s: %s (%s)" % ["Сейчас" if _current_task != 0 else "Последняя задача", task["title"], task["status"]]
+		var lines: PackedStringArray = []
+		var plan: Array = task.get("plan", [])
+		for i in plan.size():
+			lines.append("%d. %s" % [i + 1, str(plan[i])])
+		if str(task.get("note", "")) != "":
+			lines.append("[i]%s[/i]" % str(task["note"]))
+		_dock_plan.text = "\n".join(lines)
+		_dock_undo_button.disabled = task["status"] in ["отменена"] or task.get("entries", []).is_empty()
+	_dock_tree.clear()
+	var root := _dock_tree.create_item()
+	var shown := 0
+	var index := _tasks.size() - 1
+	var loose: Array = []  # записи вне задач
+	for entry in _journal:
+		if int(entry.get("task", 0)) == 0:
+			loose.append(entry)
+	var groups: Array = []
+	while index >= 0 and groups.size() < 15:
+		groups.append(_tasks[index])
+		index -= 1
+	if not loose.is_empty():
+		groups.append({"title": "Вне задач", "status": "", "entries": loose.map(func(e): return e["id"]), "loose": true})
+	for group in groups:
+		var item := _dock_tree.create_item(root)
+		item.set_text(0, str(group.get("started", "")).substr(11, 5))
+		item.set_text(1, "задача" if not group.get("loose", false) else "")
+		item.set_text(2, "%s%s" % [group["title"], " — " + str(group["status"]) if str(group.get("status", "")) != "" else ""])
+		item.set_metadata(0, {"task": group.get("id", 0)})
+		item.collapsed = shown > 0
+		var ids: Array = group.get("entries", []).duplicate()
+		ids.reverse()
+		for id in ids:
+			var entry := _find_entry(int(id))
+			if entry.is_empty():
+				continue
+			var child := _dock_tree.create_item(item)
+			child.set_text(0, str(entry["time"]).substr(11, 5))
+			child.set_text(1, str(entry["command"]))
+			var mark := "✓ " if entry["status"] == "ok" else "✗ "
+			if entry.get("undone", false):
+				mark = "↶ "
+			child.set_text(2, mark + str(entry["summary"]))
+			child.set_metadata(0, {"entry": entry["id"]})
+			if entry["status"] != "ok":
+				child.set_custom_color(2, Color(1.0, 0.45, 0.4))
+			elif entry.get("undone", false):
+				child.set_custom_color(2, Color(0.6, 0.6, 0.6))
+		shown += 1
+
+
+func _on_dock_item_selected() -> void:
+	var item := _dock_tree.get_selected()
+	if item == null:
+		return
+	var meta = item.get_metadata(0)
+	if not (meta is Dictionary):
+		return
+	if meta.has("entry"):
+		var entry := _find_entry(int(meta["entry"]))
+		if entry.is_empty():
+			return
+		var lines: PackedStringArray = ["[b]%s[/b] · %s · %s" % [entry["command"], entry["time"], entry["status"]], str(entry["summary"])]
+		if not entry.get("files", []).is_empty():
+			lines.append("Файлы: " + ", ".join(PackedStringArray(entry["files"].map(func(f): return str(f)))))
+		for e in entry.get("errors", []):
+			lines.append("[color=salmon]%s[/color]" % str(e))
+		if entry.get("undone", false):
+			lines.append("[i]отменено[/i]")
+		elif not entry.get("undo", {}).is_empty():
+			lines.append("[i]можно отменить кнопкой «Отменить задачу»[/i]")
+		_dock_details.text = "\n".join(lines)
+	elif meta.has("task"):
+		var task := _find_task(int(meta["task"]))
+		if task.is_empty():
+			return
+		var lines: PackedStringArray = ["[b]%s[/b] · %s → %s · %s" % [task["title"], task["started"], task["finished"], task["status"]]]
+		var files := _task_files(task)
+		if not files.is_empty():
+			lines.append("Файлы: " + ", ".join(PackedStringArray(files.map(func(f): return str(f)))))
+		if str(task.get("note", "")) != "":
+			lines.append(str(task["note"]))
+		_dock_details.text = "\n".join(lines)
+
+
+func _on_dock_undo() -> void:
+	var response := _task_undo({})
+	var result: Dictionary = response.get("result", {})
+	if response.get("status", "") != "ok":
+		_dock_details.text = "[color=salmon]%s[/color]" % str(response.get("errors", [""])[0])
+		return
+	var lines: PackedStringArray = ["Отменено (%d):" % result["undone"].size()]
+	for u in result["undone"]:
+		lines.append("↶ " + str(u))
+	for s in result["skipped"]:
+		lines.append("[color=salmon]не отменено: %s[/color]" % str(s))
+	if result["undone"].size() > 0:
+		lines.append("[i]Убранные файлы лежат в %s[/i]" % TRASH_DIR)
+	_dock_details.text = "\n".join(lines)
