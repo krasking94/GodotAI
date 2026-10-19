@@ -501,7 +501,7 @@ func _coerce(node: Node, prop: String, value: Variant) -> Dictionary:
 	if prop == "mesh" and typeof(value) == TYPE_DICTIONARY:
 		return _make_mesh(value)
 	if prop == "shape" and typeof(value) == TYPE_DICTIONARY:
-		return _make_shape(value)
+		return _make_shape_2d(value) if node is CollisionShape2D else _make_shape(value)
 	if prop == "environment" and typeof(value) == TYPE_DICTIONARY:
 		return _make_environment(value)
 	if prop == "material_override" or prop == "material":
@@ -754,6 +754,33 @@ func _make_shape(spec: Dictionary) -> Dictionary:
 			return {"error": "неизвестная форма «%s» (box, sphere, capsule, cylinder)" % primitive}
 
 
+## Физическая форма для CollisionShape2D: {"primitive": "rectangle"|"circle"|"capsule", "size": [w, h], "radius", "height"}.
+func _make_shape_2d(spec: Dictionary) -> Dictionary:
+	var primitive := str(spec.get("primitive", "rectangle"))
+	match primitive:
+		"rectangle", "box":
+			var rect := RectangleShape2D.new()
+			if spec.has("size"):
+				if not _is_number_array(spec["size"], 2):
+					return {"error": "size для rectangle: список из 2 чисел"}
+				rect.size = Vector2(spec["size"][0], spec["size"][1])
+			return {"value": rect}
+		"circle", "sphere":
+			var circle := CircleShape2D.new()
+			if spec.has("radius"):
+				circle.radius = float(spec["radius"])
+			return {"value": circle}
+		"capsule":
+			var capsule := CapsuleShape2D.new()
+			if spec.has("radius"):
+				capsule.radius = float(spec["radius"])
+			if spec.has("height"):
+				capsule.height = float(spec["height"])
+			return {"value": capsule}
+		_:
+			return {"error": "неизвестная 2D-форма «%s» (rectangle, circle, capsule)" % primitive}
+
+
 ## Окружение для WorldEnvironment: {"sky": true, "ambient_energy": 0.0..1.0, "sky_color": цвет, "horizon_color": цвет, "fog": true}.
 ## С небом теневые стороны объектов подсвечиваются рассеянным светом, а фон становится небом.
 func _make_environment(spec: Dictionary) -> Dictionary:
@@ -851,7 +878,7 @@ func _to_json(value: Variant) -> Variant:
 				return value.resource_path
 			if value is PrimitiveMesh:
 				return _describe_mesh(value)
-			if value is Shape3D:
+			if value is Shape3D or value is Shape2D:
 				return _describe_shape(value)
 			if value is Environment:
 				return {"environment": "Environment", "sky": value.sky != null,
@@ -1147,13 +1174,13 @@ func _describe_mesh(mesh: PrimitiveMesh) -> Dictionary:
 	return info
 
 
-func _describe_shape(shape: Shape3D) -> Dictionary:
+func _describe_shape(shape: Resource) -> Dictionary:
 	var info := {"shape": shape.get_class()}
-	if shape is BoxShape3D:
+	if shape is BoxShape3D or shape is RectangleShape2D:
 		info["size"] = _to_json(shape.size)
-	elif shape is SphereShape3D:
+	elif shape is SphereShape3D or shape is CircleShape2D:
 		info["radius"] = shape.radius
-	elif shape is CapsuleShape3D or shape is CylinderShape3D:
+	elif shape is CapsuleShape3D or shape is CylinderShape3D or shape is CapsuleShape2D:
 		info["radius"] = shape.radius
 		info["height"] = shape.height
 	return info

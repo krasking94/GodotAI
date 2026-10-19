@@ -1,0 +1,99 @@
+[gd_scene format=3 uid="uid://djb6moi1ml2pt"]
+
+[ext_resource type="Script" uid="uid://chvpk6jcok13v" path="res://game/player2d.gd" id="1_4onuv"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_4onuv"]
+size = Vector2(1280, 80)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1bore"]
+size = Vector2(240, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_q11yg"]
+size = Vector2(240, 32)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_d4uo0"]
+radius = 14.0
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_xrjlp"]
+radius = 14.0
+height = 48.0
+
+[node name="Platformer2D" type="Node2D" unique_id=1234995515]
+
+[node name="Sky" type="ColorRect" parent="." unique_id=1313254238]
+offset_right = 1280.0
+offset_bottom = 720.0
+color = Color(0.61960787, 0.827451, 1, 1)
+
+[node name="Ground" type="StaticBody2D" parent="." unique_id=31739380]
+position = Vector2(640, 680)
+
+[node name="Shape" type="CollisionShape2D" parent="Ground" unique_id=307618219]
+shape = SubResource("RectangleShape2D_4onuv")
+
+[node name="Look" type="ColorRect" parent="Ground" unique_id=1747115535]
+offset_left = -640.0
+offset_top = -40.0
+offset_right = 640.0
+offset_bottom = 40.0
+color = Color(0.36078432, 0.5411765, 0.23529412, 1)
+
+[node name="PlatformA" type="StaticBody2D" parent="." unique_id=94440962]
+position = Vector2(420, 520)
+
+[node name="Shape" type="CollisionShape2D" parent="PlatformA" unique_id=2066217078]
+shape = SubResource("RectangleShape2D_1bore")
+
+[node name="Look" type="ColorRect" parent="PlatformA" unique_id=2030512695]
+offset_left = -120.0
+offset_top = -16.0
+offset_right = 120.0
+offset_bottom = 16.0
+color = Color(0.5411765, 0.41960785, 0.23529412, 1)
+
+[node name="PlatformB" type="StaticBody2D" parent="." unique_id=1104813799]
+position = Vector2(820, 400)
+
+[node name="Shape" type="CollisionShape2D" parent="PlatformB" unique_id=284330427]
+shape = SubResource("RectangleShape2D_q11yg")
+
+[node name="Look" type="ColorRect" parent="PlatformB" unique_id=1551030480]
+offset_left = -120.0
+offset_top = -16.0
+offset_right = 120.0
+offset_bottom = 16.0
+color = Color(0.5411765, 0.41960785, 0.23529412, 1)
+
+[node name="Coin" type="Area2D" parent="." unique_id=679129166]
+position = Vector2(820, 350)
+
+[node name="Shape" type="CollisionShape2D" parent="Coin" unique_id=1220348370]
+shape = SubResource("CircleShape2D_d4uo0")
+
+[node name="Look" type="ColorRect" parent="Coin" unique_id=68503081]
+offset_left = -12.0
+offset_top = -12.0
+offset_right = 12.0
+offset_bottom = 12.0
+color = Color(1, 0.8235294, 0.23529412, 1)
+
+[node name="Player" type="CharacterBody2D" parent="." unique_id=1631815362]
+position = Vector2(160, 600)
+script = ExtResource("1_4onuv")
+
+[node name="Shape" type="CollisionShape2D" parent="Player" unique_id=537587691]
+shape = SubResource("CapsuleShape2D_xrjlp")
+
+[node name="Look" type="ColorRect" parent="Player" unique_id=628882318]
+offset_left = -14.0
+offset_top = -24.0
+offset_right = 14.0
+offset_bottom = 24.0
+color = Color(0.8784314, 0.27058825, 0.23529412, 1)
+
+[node name="Camera" type="Camera2D" parent="Player" unique_id=396880415]
+limit_left = 0
+limit_top = 0
+limit_right = 1280
+limit_bottom = 720
+position_smoothing_enabled = true

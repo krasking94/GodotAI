@@ -552,6 +552,105 @@ def log_get(project: Path, options) -> dict:
 # Разбор аргументов
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Установка моста в другой проект (новый или существующий)
+# ---------------------------------------------------------------------------
+
+SETUP_FILES = [  # что копируется: (откуда относительно этого репозитория, куда относительно цели)
+    ("addons/ai_bridge/plugin.cfg", "addons/ai_bridge/plugin.cfg"),
+    ("addons/ai_bridge/plugin.gd", "addons/ai_bridge/plugin.gd"),
+    ("addons/ai_bridge/plugin.gd.uid", "addons/ai_bridge/plugin.gd.uid"),
+    ("tools/enginectl/enginectl.py", "tools/enginectl/enginectl.py"),
+    ("tools/enginectl/examples/room.json", "tools/enginectl/examples/room.json"),
+    ("tools/enginectl/examples/platformer2d.json", "tools/enginectl/examples/platformer2d.json"),
+    ("game/room.gd", "game/room.gd"),
+    ("game/player2d.gd", "game/player2d.gd"),
+]
+PLUGIN_ENTRY = 'res://addons/ai_bridge/plugin.cfg'
+MIN_GITIGNORE = "# Служебные папки Godot\n.godot/\n.import/\nexport_presets.cfg\n\n# Сборки\nbuild/\n*.apk\n*.exe\n*.pck\n\n# Секреты\n.env\n*.keystore\n"
+
+
+def setup_project(source: Path, options) -> dict:
+    """Копирует плагин AI Bridge, enginectl и пример комнаты в другой проект Godot и включает плагин.
+    Если в цели нет project.godot, создаётся новый пустой проект."""
+    target = Path(options.target).expanduser()
+    if not target.is_absolute():
+        target = Path.cwd() / target
+    target = target.resolve()
+    if target == source.resolve():
+        return fail("Это и есть исходный проект: укажите другую папку в --target")
+    missing = [src for src, _ in SETUP_FILES if not (source / src).is_file()]
+    if missing:
+        return fail(f"В исходном проекте {source} нет файлов: {', '.join(missing)}")
+    target.mkdir(parents=True, exist_ok=True)
+    copied, updated, kept = [], [], []
+    for src, dst in SETUP_FILES:
+        src_path, dst_path = source / src, target / dst
+        if dst_path.is_file():
+            if dst_path.read_bytes() == src_path.read_bytes():
+                kept.append(dst)
+                continue
+            if dst.startswith("game/") and not options.force:
+                kept.append(dst)  # пример игры не затираем: его могли изменить
+                continue
+            updated.append(dst)
+        else:
+            copied.append(dst)
+        dst_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src_path, dst_path)
+
+    project_file = target / "project.godot"
+    name = options.name or target.name
+    created_project = False
+    if project_file.is_file():
+        text = project_file.read_text(encoding="utf-8")
+        new_text = enable_plugin(text)
+        if new_text != text:
+            project_file.write_text(new_text, encoding="utf-8")
+            plugin_state = "включён в существующем project.godot"
+        else:
+            plugin_state = "уже был включён"
+    else:
+        project_file.write_text(
+            "; Engine configuration file.\n; It's best edited using the editor UI and not directly,\n"
+            "; since the parameters that go here are not all obvious.\n;\n; Format:\n"
+            ";   [section] ; section goes between []\n;   param=value ; assign values to parameters\n\n"
+            "config_version=5\n\n[application]\n\n"
+            f'config/name="{name}"\nconfig/features=PackedStringArray("4.7")\n\n'
+            f'[editor_plugins]\n\nenabled=PackedStringArray("{PLUGIN_ENTRY}")\n', encoding="utf-8")
+        created_project = True
+        plugin_state = "включён в новом project.godot"
+    gitignore = target / ".gitignore"
+    if not gitignore.is_file():
+        gitignore.write_text(MIN_GITIGNORE, encoding="utf-8")
+        copied.append(".gitignore")
+    return ok({"target": str(target), "project_created": created_project, "project_name": name if created_project else None,
+               "plugin": plugin_state, "copied": copied, "updated": updated, "unchanged": kept,
+               "next": [f"Откройте папку в Godot: Менеджер проектов → Импорт → {project_file}",
+                        "В папке проекта: python tools/enginectl/enginectl.py doctor",
+                        "Комната одной командой: python tools/enginectl/enginectl.py scene build --file tools/enginectl/examples/room.json",
+                        "Запуск: python tools/enginectl/enginectl.py game run --scene res://scenes/room.tscn --seconds 5",
+                        "2D-пример: scene build --file tools/enginectl/examples/platformer2d.json, затем game run --scene res://scenes/platformer2d.tscn"]},
+              files=[str(target / f) for f in copied + updated])
+
+
+def enable_plugin(text: str) -> str:
+    """Добавляет плагин в [editor_plugins] enabled=PackedStringArray(...) файла project.godot, не трогая остальное."""
+    if PLUGIN_ENTRY in text:
+        return text
+    section = re.search(r"^\[editor_plugins\]\s*$", text, flags=re.M)
+    if section is None:
+        return text.rstrip("\n") + f'\n\n[editor_plugins]\n\nenabled=PackedStringArray("{PLUGIN_ENTRY}")\n'
+    enabled = re.search(r"^enabled=PackedStringArray\((.*)\)\s*$", text[section.end():], flags=re.M)
+    if enabled is None:
+        return text[:section.end()] + f'\n\nenabled=PackedStringArray("{PLUGIN_ENTRY}")' + text[section.end():]
+    inner = enabled.group(1).strip()
+    new_inner = f'"{PLUGIN_ENTRY}"' if inner == "" else f'{inner}, "{PLUGIN_ENTRY}"'
+    start = section.end() + enabled.start(1)
+    end = section.end() + enabled.end(1)
+    return text[:start] + new_inner + text[end:]
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="enginectl", description="Управление редактором Godot для ИИ")
     parser.add_argument("--project", type=Path, help="папка проекта Godot (по умолчанию ищется от текущей папки)")
@@ -660,6 +759,11 @@ def build_parser() -> argparse.ArgumentParser:
     editor_shot = editor_sub.add_parser("screenshot", help="снимок окна редактора в PNG (редактор должен быть с экраном, не headless)")
     editor_shot.add_argument("--out", default=".godot/ai_bridge/editor.png", help="куда сохранить PNG")
 
+    setup = sub.add_parser("setup", help="поставить мост (плагин AI Bridge, enginectl, пример комнаты) в другой проект Godot; без project.godot создаётся новый проект")
+    setup.add_argument("--target", required=True, help="папка другого проекта (новая или существующая)")
+    setup.add_argument("--name", help="имя нового проекта (по умолчанию имя папки)")
+    setup.add_argument("--force", action="store_true", help="перезаписать и пример игры (game/room.gd), если он менялся")
+
     log = sub.add_parser("log", help="лог последнего запуска игры")
     log_sub = log.add_subparsers(dest="log_command", required=True)
     log_get_cmd = log_sub.add_parser("get", help="ошибки, предупреждения и вывод последнего запуска")
@@ -759,6 +863,8 @@ def dispatch(project: Path, options) -> dict:
         return game_status(project)
     if options.command == "log":
         return log_get(project, options)
+    if options.command == "setup":
+        return setup_project(project, options)
     if options.command == "task":
         if options.task_command == "begin":
             return send(project, "task.begin", {"title": options.title, "plan": options.plan})
