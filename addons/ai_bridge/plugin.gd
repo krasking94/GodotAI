@@ -5,7 +5,7 @@ extends EditorPlugin
 ## Запрос: {"token": "...", "command": "doctor", "args": {}}
 ## Ответ:  {"status": "ok"|"error", "result": {...}, "errors": [], "warnings": [], "files": []}
 
-const PLUGIN_VERSION := "0.10.0"
+const PLUGIN_VERSION := "0.10.1"
 ## Флаги, при которых Godot запускает редактор лишь на время разовой задачи (сборка, импорт, проверка).
 const BATCH_FLAGS := ["--export-debug", "--export-release", "--export-pack", "--export-patch", "--import",
 	"--quit", "--quit-after", "--doctool", "--check-only", "--convert-3to4", "--validate-conversion-3to4"]
@@ -59,9 +59,10 @@ func _exit_tree() -> void:
 		c.peer.disconnect_from_host()
 	_clients.clear()
 	_server.stop()
-	if _dock != null:
-		remove_control_from_docks(_dock)
-		_dock.queue_free()
+	if _dock_panel != null:
+		remove_dock(_dock_panel)
+		_dock_panel.queue_free()
+		_dock_panel = null
 		_dock = null
 	# Удаляем только свой файл подключения: чужой (другого редактора) не трогаем.
 	if _port != 0 and _connection_file_pid() == OS.get_process_id():
@@ -1387,6 +1388,7 @@ var _tasks: Array = []       # {id, title, plan, started, finished, status, note
 var _next_id := 1
 var _current_task := 0       # id идущей задачи или 0
 var _dock: VBoxContainer = null
+var _dock_panel: EditorDock = null  # обёртка панели в редакторе 4.7 (заголовок, место, ключ раскладки)
 var _dock_status: Label
 var _dock_task: Label
 var _dock_plan: RichTextLabel
@@ -1853,7 +1855,15 @@ func _build_dock() -> void:
 	_dock_details.custom_minimum_size = Vector2(0, 120)
 	_dock_details.text = "Выберите запись, чтобы увидеть файлы и ошибки."
 	_dock.add_child(_dock_details)
-	add_control_to_dock(EditorPlugin.DOCK_SLOT_RIGHT_UL, _dock)
+	# Нижняя правая секция обычно пуста, поэтому панель видна сразу; рядом с Инспектором она пряталась
+	# за стрелками прокрутки вкладок (на экране владельца вкладка не влезала). Новый ключ раскладки нужен,
+	# потому что редактор запоминает место панели по ключу и иначе вернул бы её на старое место.
+	_dock_panel = EditorDock.new()
+	_dock_panel.title = "Задачи ИИ"
+	_dock_panel.layout_key = "ai_bridge_tasks"
+	_dock_panel.default_slot = EditorDock.DOCK_SLOT_RIGHT_BL
+	_dock_panel.add_child(_dock)
+	add_dock(_dock_panel)
 	_dock_refresh()
 
 
@@ -1861,6 +1871,8 @@ func _build_dock() -> void:
 func _dock_show() -> void:
 	if _dock == null:
 		return
+	if _dock_panel != null:
+		_dock_panel.make_visible()
 	# Между панелью и TabContainer редактор может вставлять свои обёртки: ищем ближайшую вкладку.
 	var node: Node = _dock
 	while node != null and not (node.get_parent() is TabContainer):
