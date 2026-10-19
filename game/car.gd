@@ -3,12 +3,13 @@ extends VehicleBody3D
 ## Машина на упрощённой физике Godot (VehicleBody3D: кузов + четыре VehicleWheel3D).
 ## Управление, пока active: W/S (или стрелки) — газ и задний ход, A/D — руль,
 ## пробел — тормоз, R — поставить на колёса, если перевернулась (одно нажатие, только когда лежит). Пока active выключен
-## (водителя нет), машина стоит на ручнике; персонаж включает active, садясь в неё (клавиша E).
+## (водителя нет), машина стоит на ручнике; персонаж включает active, садясь в неё (клавиша E рядом: prompt/interact).
+## Если машина упала ниже FALL_LIMIT_Y (уехала за край площадки), она сама возвращается на стартовое место.
 ## S на ходу сначала тормозит, и только когда машина почти остановилась, включает задний ход.
 ## Руль на скорости становится мягче, а выше MAX_SPEED мотор не разгоняет: так машина не переворачивается.
 ##
 ## Самопроверка для ИИ: test_program = "gas:2,left:2,brake:1" (фазы через запятую, секунды после двоеточия;
-## фазы: gas, reverse, left, right, gasleft, gasright, brake, coast, flip). После каждой фазы печатается строка
+## фазы: gas, reverse, left, right, gasleft, gasright, brake, coast, flip, fall). После каждой фазы печатается строка
 ## «Машина [фаза]: скорость, путь, поворот курса, крен», по ней ИИ видит в логе, как машина себя ведёт.
 ## test_drive > 0 — то же, что test_program = "gas:<секунды>".
 
@@ -19,6 +20,7 @@ const MAX_STEER := 0.55       # радианы на месте
 const MIN_STEER := 0.18       # радианы на максимальной скорости
 const STEER_SPEED := 2.5
 const REVERSE_SWITCH_SPEED := 0.8
+const FALL_LIMIT_Y := -10.0   # ниже этой высоты считаем, что машина упала за край
 
 @export var active := true
 @export var test_drive := 0.0
@@ -31,10 +33,14 @@ var _phase_start_pos := Vector3.ZERO
 var _phase_start_yaw := 0.0
 var _speed_label: Label  # спидометр в углу экрана, виден пока active
 var _r_was_down := false  # чтобы R срабатывала по нажатию, а не пока зажата
+var _start_transform := Transform3D()  # куда вернуть машину, если упала за край
 
 
 func _ready() -> void:
 	add_to_group("cars")  # по этой группе персонаж находит, куда сесть (E)
+	add_to_group("interactables")  # E рядом с машиной — сесть (см. prompt/interact)
+	add_to_group("persist")  # положение сохраняется в файле сохранения
+	_start_transform = global_transform
 	_speed_label = Label.new()
 	_speed_label.add_theme_font_size_override("font_size", 32)
 	_speed_label.position = Vector2(24, 16)
@@ -88,6 +94,9 @@ func _physics_process(delta: float) -> void:
 					global_transform.basis = Basis(Vector3.BACK, PI * 0.6)
 				elif _phase_time > 0.5 and is_flipped():
 					flip_upright()
+			"fall":  # проверка возврата: уронить машину под площадку, она должна вернуться на старт
+				if _phase_time == 0.0:
+					global_position = Vector3(global_position.x, FALL_LIMIT_Y - 5.0, global_position.z)
 		_phase_time += delta
 		if _phase_time >= _phases[_phase_index]["seconds"]:
 			_report_phase(speed)
@@ -131,6 +140,41 @@ func _physics_process(delta: float) -> void:
 	_speed_label.visible = active
 	if active:
 		_speed_label.text = "%d км/ч" % roundi(absf(forward_speed) * 3.6)
+
+	if global_position.y < FALL_LIMIT_Y:
+		print("Машина упала за край (была в %s), возвращаю на старт" % global_position.snapped(Vector3(0.1, 0.1, 0.1)))
+		return_to_start()
+
+
+## Возвращает машину на стартовое место (после падения за край площадки).
+func return_to_start() -> void:
+	global_transform = _start_transform
+	linear_velocity = Vector3.ZERO
+	angular_velocity = Vector3.ZERO
+
+
+# --- Взаимодействие (E) и сохранение ------------------------------------------------
+
+func prompt() -> String:
+	return "E — сесть в машину"
+
+
+func interact(player: Node) -> void:
+	if player != null and player.has_method("enter_car"):
+		player.enter_car(self)
+
+
+func save_state() -> Dictionary:
+	return {"position": [global_position.x, global_position.y, global_position.z],
+		"yaw": global_transform.basis.get_euler().y}
+
+
+func load_state(state: Dictionary) -> void:
+	var p = state.get("position", null)
+	if p is Array and p.size() == 3:
+		global_transform = Transform3D(Basis(Vector3.UP, float(state.get("yaw", 0.0))), Vector3(p[0], p[1], p[2]))
+		linear_velocity = Vector3.ZERO
+		angular_velocity = Vector3.ZERO
 
 
 ## Лежит ли машина на боку или на крыше (верх кузова отклонён от вертикали больше ~45°).

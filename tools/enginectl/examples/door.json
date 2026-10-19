@@ -1,0 +1,20 @@
+{
+  "phrase": "Сделай дверь: деревянная створка на петле, над ней перекладина; открывается на E, может быть заперта и требовать ключ",
+  "scene": {
+    "path": "res://scenes/door.tscn",
+    "root_type": "Node3D",
+    "root_name": "Door"
+  },
+  "ops": [
+    {"op": "create", "parent": ".", "name": "Lintel", "type": "MeshInstance3D",
+     "props": {"mesh": {"primitive": "box", "size": [1.2, 0.2, 0.3], "color": "#9a9a9a"}, "position": [0.5, 2.1, 0]}},
+    {"op": "create", "parent": ".", "name": "Panel", "type": "StaticBody3D"},
+    {"op": "create", "parent": "Panel", "name": "Mesh", "type": "MeshInstance3D",
+     "props": {"mesh": {"primitive": "box", "size": [1.0, 2.0, 0.1], "color": "#8b5a2b"}, "position": [0.5, 1.0, 0]}},
+    {"op": "create", "parent": "Panel", "name": "Shape", "type": "CollisionShape3D",
+     "props": {"shape": {"primitive": "box", "size": [1.0, 2.0, 0.1]}, "position": [0.5, 1.0, 0]}},
+    {"op": "create", "parent": "Panel", "name": "Handle", "type": "MeshInstance3D",
+     "props": {"mesh": {"primitive": "sphere", "radius": 0.05, "color": "#f1c40f"}, "position": [0.85, 1.0, 0.08]}},
+    {"op": "set", "path": ".", "props": {"script": "res://game/door.gd"}}
+  ]
+}

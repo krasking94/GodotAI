@@ -1,0 +1,49 @@
+[gd_scene format=3 uid="uid://bmm5332gspc1i"]
+
+[ext_resource type="Script" uid="uid://myq4umht70ea" path="res://game/door.gd" id="1_hpvv5"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_uvdjg"]
+albedo_color = Color(0.6039216, 0.6039216, 0.6039216, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_83dcw"]
+material = SubResource("StandardMaterial3D_uvdjg")
+size = Vector3(1.2, 0.2, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_la1wf"]
+albedo_color = Color(0.54509807, 0.3529412, 0.16862746, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_18pbm"]
+material = SubResource("StandardMaterial3D_la1wf")
+size = Vector3(1, 2, 0.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_q5w8r"]
+size = Vector3(1, 2, 0.1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_t58dd"]
+albedo_color = Color(0.94509804, 0.76862746, 0.05882353, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_ju5n0"]
+material = SubResource("StandardMaterial3D_t58dd")
+radius = 0.05
+height = 0.1
+
+[node name="Door" type="Node3D" unique_id=2045194005]
+script = ExtResource("1_hpvv5")
+
+[node name="Lintel" type="MeshInstance3D" parent="." unique_id=761770752]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 2.1, 0)
+mesh = SubResource("BoxMesh_83dcw")
+
+[node name="Panel" type="StaticBody3D" parent="." unique_id=718261307]
+
+[node name="Mesh" type="MeshInstance3D" parent="Panel" unique_id=874026362]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1, 0)
+mesh = SubResource("BoxMesh_18pbm")
+
+[node name="Shape" type="CollisionShape3D" parent="Panel" unique_id=20603438]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1, 0)
+shape = SubResource("BoxShape3D_q5w8r")
+
+[node name="Handle" type="MeshInstance3D" parent="Panel" unique_id=895059764]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.85, 1, 0.08)
+mesh = SubResource("SphereMesh_ju5n0")

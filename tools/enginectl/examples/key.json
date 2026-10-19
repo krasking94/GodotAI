@@ -1,0 +1,15 @@
+{
+  "phrase": "Сделай ключ: небольшой жёлтый предмет, который крутится на месте и подбирается на E",
+  "scene": {
+    "path": "res://scenes/key.tscn",
+    "root_type": "Node3D",
+    "root_name": "Key"
+  },
+  "ops": [
+    {"op": "create", "parent": ".", "name": "Mesh", "type": "MeshInstance3D",
+     "props": {"mesh": {"primitive": "box", "size": [0.5, 0.08, 0.2], "color": "#f1c40f"}}},
+    {"op": "create", "parent": ".", "name": "Ring", "type": "MeshInstance3D",
+     "props": {"mesh": {"primitive": "cylinder", "radius": 0.12, "height": 0.08, "color": "#f1c40f"}, "position": [-0.3, 0, 0]}},
+    {"op": "set", "path": ".", "props": {"script": "res://game/item.gd", "item_name": "Ключ"}}
+  ]
+}

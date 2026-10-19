@@ -1,0 +1,17 @@
+{
+  "phrase": "Сделай кнопку на столбике: красная крышка сверху; нажатие на E включает и выключает заданный объект",
+  "scene": {
+    "path": "res://scenes/button.tscn",
+    "root_type": "StaticBody3D",
+    "root_name": "Button"
+  },
+  "ops": [
+    {"op": "create", "parent": ".", "name": "Post", "type": "MeshInstance3D",
+     "props": {"mesh": {"primitive": "cylinder", "radius": 0.08, "height": 1.0, "color": "#7f8c8d"}, "position": [0, 0.5, 0]}},
+    {"op": "create", "parent": ".", "name": "Cap", "type": "MeshInstance3D",
+     "props": {"mesh": {"primitive": "box", "size": [0.3, 0.1, 0.3], "color": "#d62828"}, "position": [0, 1.05, 0]}},
+    {"op": "create", "parent": ".", "name": "Shape", "type": "CollisionShape3D",
+     "props": {"shape": {"primitive": "box", "size": [0.3, 1.1, 0.3]}, "position": [0, 0.55, 0]}},
+    {"op": "set", "path": ".", "props": {"script": "res://game/button.gd"}}
+  ]
+}
