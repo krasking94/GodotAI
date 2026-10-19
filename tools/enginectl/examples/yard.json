@@ -1,5 +1,5 @@
 {
-  "phrase": "Сделай двор под открытым небом: клетчатое поле 30×30, обнесённое стенами, чтобы нельзя было уехать за край; в углу сарай с запертой дверью, ключ от неё лежит во дворе, внутри сарая кнопка, которая выключает солнце; персонаж, который ходит и бегает, и машина, в которую он садится на E; Esc открывает меню паузы, F5 сохраняет игру, F9 загружает; вокруг двора домики и деревья из готовых моделей Kenney; в фонтан и деревья внутри двора нельзя пройти",
+  "phrase": "Сделай двор под открытым небом: клетчатое поле 30×30, обнесённое стенами, чтобы нельзя было уехать за край; в углу сарай с запертой дверью, ключ от неё лежит во дворе, внутри сарая кнопка, которая выключает солнце; персонаж, который ходит и бегает, и машина, в которую он садится на E; Esc открывает меню паузы, F5 сохраняет игру, F9 загружает; вокруг двора домики и деревья из готовых моделей Kenney; в фонтан и деревья внутри двора нельзя пройти; перед сараем низкий навес на четырёх столбиках, под него можно только присев.",
   "scene": {
     "path": "res://scenes/yard.tscn",
     "root_type": "Node3D",
@@ -489,6 +489,234 @@
           -9,
           2.1,
           -9
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Canopy",
+      "type": "StaticBody3D",
+      "props": {
+        "position": [
+          -9,
+          0,
+          -3
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Canopy",
+      "name": "Roof",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "box",
+          "size": [
+            3,
+            0.2,
+            3
+          ],
+          "color": "#4a6e8d"
+        },
+        "position": [
+          0,
+          1.3,
+          0
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Canopy",
+      "name": "RoofShape",
+      "type": "CollisionShape3D",
+      "props": {
+        "shape": {
+          "primitive": "box",
+          "size": [
+            3,
+            0.2,
+            3
+          ]
+        },
+        "position": [
+          0,
+          1.3,
+          0
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Canopy",
+      "name": "PostA",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "box",
+          "size": [
+            0.15,
+            1.2,
+            0.15
+          ],
+          "color": "#6e5b4a"
+        },
+        "position": [
+          -1.4,
+          0.6,
+          -1.4
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Canopy",
+      "name": "PostAShape",
+      "type": "CollisionShape3D",
+      "props": {
+        "shape": {
+          "primitive": "box",
+          "size": [
+            0.15,
+            1.2,
+            0.15
+          ]
+        },
+        "position": [
+          -1.4,
+          0.6,
+          -1.4
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Canopy",
+      "name": "PostB",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "box",
+          "size": [
+            0.15,
+            1.2,
+            0.15
+          ],
+          "color": "#6e5b4a"
+        },
+        "position": [
+          1.4,
+          0.6,
+          -1.4
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Canopy",
+      "name": "PostBShape",
+      "type": "CollisionShape3D",
+      "props": {
+        "shape": {
+          "primitive": "box",
+          "size": [
+            0.15,
+            1.2,
+            0.15
+          ]
+        },
+        "position": [
+          1.4,
+          0.6,
+          -1.4
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Canopy",
+      "name": "PostC",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "box",
+          "size": [
+            0.15,
+            1.2,
+            0.15
+          ],
+          "color": "#6e5b4a"
+        },
+        "position": [
+          -1.4,
+          0.6,
+          1.4
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Canopy",
+      "name": "PostCShape",
+      "type": "CollisionShape3D",
+      "props": {
+        "shape": {
+          "primitive": "box",
+          "size": [
+            0.15,
+            1.2,
+            0.15
+          ]
+        },
+        "position": [
+          -1.4,
+          0.6,
+          1.4
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Canopy",
+      "name": "PostD",
+      "type": "MeshInstance3D",
+      "props": {
+        "mesh": {
+          "primitive": "box",
+          "size": [
+            0.15,
+            1.2,
+            0.15
+          ],
+          "color": "#6e5b4a"
+        },
+        "position": [
+          1.4,
+          0.6,
+          1.4
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Canopy",
+      "name": "PostDShape",
+      "type": "CollisionShape3D",
+      "props": {
+        "shape": {
+          "primitive": "box",
+          "size": [
+            0.15,
+            1.2,
+            0.15
+          ]
+        },
+        "position": [
+          1.4,
+          0.6,
+          1.4
         ]
       }
     },
