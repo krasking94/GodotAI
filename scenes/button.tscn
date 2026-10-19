@@ -1,0 +1,37 @@
+[gd_scene format=3 uid="uid://clhp5usfg750w"]
+
+[ext_resource type="Script" uid="uid://duph38s4hyqda" path="res://game/button.gd" id="1_mi6dp"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rhj8v"]
+albedo_color = Color(0.49803922, 0.54901963, 0.5529412, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_3q610"]
+material = SubResource("StandardMaterial3D_rhj8v")
+top_radius = 0.08
+bottom_radius = 0.08
+height = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_i7y4x"]
+albedo_color = Color(0.8392157, 0.15686275, 0.15686275, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_1bdt2"]
+material = SubResource("StandardMaterial3D_i7y4x")
+size = Vector3(0.3, 0.1, 0.3)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_8m7bo"]
+size = Vector3(0.3, 1.1, 0.3)
+
+[node name="Button" type="StaticBody3D" unique_id=1915319942]
+script = ExtResource("1_mi6dp")
+
+[node name="Post" type="MeshInstance3D" parent="." unique_id=640716226]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("CylinderMesh_3q610")
+
+[node name="Cap" type="MeshInstance3D" parent="." unique_id=1461983343]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 0)
+mesh = SubResource("BoxMesh_1bdt2")
+
+[node name="Shape" type="CollisionShape3D" parent="." unique_id=519227079]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0)
+shape = SubResource("BoxShape3D_8m7bo")

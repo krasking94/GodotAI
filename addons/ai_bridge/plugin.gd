@@ -5,7 +5,7 @@ extends EditorPlugin
 ## Запрос: {"token": "...", "command": "doctor", "args": {}}
 ## Ответ:  {"status": "ok"|"error", "result": {...}, "errors": [], "warnings": [], "files": []}
 
-const PLUGIN_VERSION := "0.9.0"
+const PLUGIN_VERSION := "0.9.1"
 const HOST := "127.0.0.1"
 const DEFAULT_PORT := 47615
 const PORT_TRIES := 10
@@ -373,8 +373,11 @@ func _plan_set(i: int, op: Dictionary, root: Node, created: Dictionary, deleted:
 			errors.append("Операция %d: %s" % [i, converted["error"]])
 			continue
 		var old = node.get(str(prop))
-		if created.values().has(node):
-			node.set(str(prop), converted["value"])  # узел ещё не в сцене, менять можно напрямую
+		# Свежий узел (создан в этом же наборе или корень собираемой сцены) ещё не в дереве редактора:
+		# меняем напрямую. Так «script» вступает в силу сразу, и следующие свойства того же set
+		# (например @export-поля скрипта) проходят проверку «есть ли такое свойство».
+		if created.values().has(node) or (node == root and _build_target_path != ""):
+			node.set(str(prop), converted["value"])
 		else:
 			steps.append({"kind": "set", "node": node, "prop": str(prop), "value": converted["value"], "old": old})
 		entry["changes"][str(prop)] = {"from": _to_json(old), "to": _to_json(converted["value"])}

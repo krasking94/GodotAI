@@ -1,0 +1,29 @@
+[gd_scene format=3 uid="uid://bhlde45okh3w3"]
+
+[ext_resource type="Script" uid="uid://csl081nv1xdd0" path="res://game/item.gd" id="1_yk2u2"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_fttkb"]
+albedo_color = Color(0.94509804, 0.76862746, 0.05882353, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_wy8tx"]
+material = SubResource("StandardMaterial3D_fttkb")
+size = Vector3(0.5, 0.08, 0.2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_brs3p"]
+albedo_color = Color(0.94509804, 0.76862746, 0.05882353, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_jcln5"]
+material = SubResource("StandardMaterial3D_brs3p")
+top_radius = 0.12
+bottom_radius = 0.12
+height = 0.08
+
+[node name="Key" type="Node3D" unique_id=2089049095]
+script = ExtResource("1_yk2u2")
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1182377318]
+mesh = SubResource("BoxMesh_wy8tx")
+
+[node name="Ring" type="MeshInstance3D" parent="." unique_id=2098811227]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.3, 0, 0)
+mesh = SubResource("CylinderMesh_jcln5")
