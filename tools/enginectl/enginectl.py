@@ -573,6 +573,11 @@ SETUP_FILES = [  # что копируется: (откуда относител
     ("game/player2d.gd", "game/player2d.gd"),
     ("game/sun2d.gd", "game/sun2d.gd"),
     ("game/coin2d.gd", "game/coin2d.gd"),
+    ("game/hero2d.gd", "game/hero2d.gd"),
+    ("game/cloud2d.gd", "game/cloud2d.gd"),
+    ("game/sky2d.gd", "game/sky2d.gd"),
+    ("game/hud2d.gd", "game/hud2d.gd"),
+    ("game/sungoal2d.gd", "game/sungoal2d.gd"),
 ]
 PLUGIN_ENTRY = 'res://addons/ai_bridge/plugin.cfg'
 MIN_GITIGNORE = "# Служебные папки Godot\n.godot/\n.import/\nexport_presets.cfg\n\n# Сборки\nbuild/\n*.apk\n*.exe\n*.pck\n\n# Секреты\n.env\n*.keystore\n"

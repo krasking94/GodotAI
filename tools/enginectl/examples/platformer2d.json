@@ -18,24 +18,83 @@
       "op": "create",
       "parent": "Background",
       "name": "Sky",
-      "type": "ColorRect",
+      "type": "Node2D",
       "props": {
-        "anchor_right": 1.0,
-        "anchor_bottom": 1.0,
-        "color": "#9ed3ff"
+        "script": "res://game/sky2d.gd"
       }
     },
     {
       "op": "create",
-      "parent": "Background",
-      "name": "Sun",
+      "parent": ".",
+      "name": "Hud",
+      "type": "CanvasLayer",
+      "props": {
+        "layer": 10,
+        "script": "res://game/hud2d.gd"
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "CloudFarA",
       "type": "Node2D",
       "props": {
         "position": [
-          1100,
-          120
+          240,
+          330
         ],
-        "script": "res://game/sun2d.gd"
+        "script": "res://game/cloud2d.gd",
+        "width": 260,
+        "height": 40,
+        "tint": "#e9f3ff"
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "CloudFarB",
+      "type": "Node2D",
+      "props": {
+        "position": [
+          760,
+          -120
+        ],
+        "script": "res://game/cloud2d.gd",
+        "width": 300,
+        "height": 40,
+        "tint": "#e9f3ff"
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "CloudFarC",
+      "type": "Node2D",
+      "props": {
+        "position": [
+          260,
+          -620
+        ],
+        "script": "res://game/cloud2d.gd",
+        "width": 280,
+        "height": 40,
+        "tint": "#e9f3ff"
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "CloudFarD",
+      "type": "Node2D",
+      "props": {
+        "position": [
+          1000,
+          -460
+        ],
+        "script": "res://game/cloud2d.gd",
+        "width": 240,
+        "height": 40,
+        "tint": "#e9f3ff"
       }
     },
     {
@@ -80,6 +139,23 @@
           600
         ],
         "color": "#5c8a3c"
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Ground",
+      "name": "Grass",
+      "type": "ColorRect",
+      "props": {
+        "position": [
+          -1920,
+          -300
+        ],
+        "size": [
+          3840,
+          14
+        ],
+        "color": "#7cc24f"
       }
     },
     {
@@ -139,7 +215,7 @@
     {
       "op": "create",
       "parent": ".",
-      "name": "Platform1",
+      "name": "Cloud1",
       "type": "StaticBody2D",
       "props": {
         "position": [
@@ -150,7 +226,7 @@
     },
     {
       "op": "create",
-      "parent": "Platform1",
+      "parent": "Cloud1",
       "name": "Shape",
       "type": "CollisionShape2D",
       "props": {
@@ -160,30 +236,25 @@
             200,
             32
           ]
-        }
+        },
+        "one_way_collision": true
       }
     },
     {
       "op": "create",
-      "parent": "Platform1",
+      "parent": "Cloud1",
       "name": "Look",
-      "type": "ColorRect",
+      "type": "Node2D",
       "props": {
-        "position": [
-          -100.0,
-          -16.0
-        ],
-        "size": [
-          200,
-          32
-        ],
-        "color": "#8a6b3c"
+        "script": "res://game/cloud2d.gd",
+        "width": 200,
+        "height": 32
       }
     },
     {
       "op": "create",
       "parent": ".",
-      "name": "Platform2",
+      "name": "Cloud2",
       "type": "StaticBody2D",
       "props": {
         "position": [
@@ -194,7 +265,7 @@
     },
     {
       "op": "create",
-      "parent": "Platform2",
+      "parent": "Cloud2",
       "name": "Shape",
       "type": "CollisionShape2D",
       "props": {
@@ -204,30 +275,25 @@
             200,
             32
           ]
-        }
+        },
+        "one_way_collision": true
       }
     },
     {
       "op": "create",
-      "parent": "Platform2",
+      "parent": "Cloud2",
       "name": "Look",
-      "type": "ColorRect",
+      "type": "Node2D",
       "props": {
-        "position": [
-          -100.0,
-          -16.0
-        ],
-        "size": [
-          200,
-          32
-        ],
-        "color": "#8a6b3c"
+        "script": "res://game/cloud2d.gd",
+        "width": 200,
+        "height": 32
       }
     },
     {
       "op": "create",
       "parent": ".",
-      "name": "Platform3",
+      "name": "Cloud3",
       "type": "StaticBody2D",
       "props": {
         "position": [
@@ -238,7 +304,7 @@
     },
     {
       "op": "create",
-      "parent": "Platform3",
+      "parent": "Cloud3",
       "name": "Shape",
       "type": "CollisionShape2D",
       "props": {
@@ -248,350 +314,37 @@
             200,
             32
           ]
-        }
+        },
+        "one_way_collision": true
       }
     },
     {
       "op": "create",
-      "parent": "Platform3",
+      "parent": "Cloud3",
       "name": "Look",
-      "type": "ColorRect",
+      "type": "Node2D",
       "props": {
-        "position": [
-          -100.0,
-          -16.0
-        ],
-        "size": [
-          200,
-          32
-        ],
-        "color": "#8a6b3c"
+        "script": "res://game/cloud2d.gd",
+        "width": 200,
+        "height": 32
       }
     },
     {
       "op": "create",
       "parent": ".",
-      "name": "Platform4",
-      "type": "StaticBody2D",
-      "props": {
-        "position": [
-          1130,
-          16
-        ]
-      }
-    },
-    {
-      "op": "create",
-      "parent": "Platform4",
-      "name": "Shape",
-      "type": "CollisionShape2D",
-      "props": {
-        "shape": {
-          "primitive": "rectangle",
-          "size": [
-            200,
-            32
-          ]
-        }
-      }
-    },
-    {
-      "op": "create",
-      "parent": "Platform4",
-      "name": "Look",
-      "type": "ColorRect",
-      "props": {
-        "position": [
-          -100.0,
-          -16.0
-        ],
-        "size": [
-          200,
-          32
-        ],
-        "color": "#8a6b3c"
-      }
-    },
-    {
-      "op": "create",
-      "parent": ".",
-      "name": "Platform5",
-      "type": "StaticBody2D",
-      "props": {
-        "position": [
-          880,
-          -144
-        ]
-      }
-    },
-    {
-      "op": "create",
-      "parent": "Platform5",
-      "name": "Shape",
-      "type": "CollisionShape2D",
-      "props": {
-        "shape": {
-          "primitive": "rectangle",
-          "size": [
-            200,
-            32
-          ]
-        }
-      }
-    },
-    {
-      "op": "create",
-      "parent": "Platform5",
-      "name": "Look",
-      "type": "ColorRect",
-      "props": {
-        "position": [
-          -100.0,
-          -16.0
-        ],
-        "size": [
-          200,
-          32
-        ],
-        "color": "#8a6b3c"
-      }
-    },
-    {
-      "op": "create",
-      "parent": ".",
-      "name": "Platform6",
-      "type": "StaticBody2D",
-      "props": {
-        "position": [
-          630,
-          -304
-        ]
-      }
-    },
-    {
-      "op": "create",
-      "parent": "Platform6",
-      "name": "Shape",
-      "type": "CollisionShape2D",
-      "props": {
-        "shape": {
-          "primitive": "rectangle",
-          "size": [
-            200,
-            32
-          ]
-        }
-      }
-    },
-    {
-      "op": "create",
-      "parent": "Platform6",
-      "name": "Look",
-      "type": "ColorRect",
-      "props": {
-        "position": [
-          -100.0,
-          -16.0
-        ],
-        "size": [
-          200,
-          32
-        ],
-        "color": "#8a6b3c"
-      }
-    },
-    {
-      "op": "create",
-      "parent": ".",
-      "name": "Platform7",
-      "type": "StaticBody2D",
-      "props": {
-        "position": [
-          380,
-          -464
-        ]
-      }
-    },
-    {
-      "op": "create",
-      "parent": "Platform7",
-      "name": "Shape",
-      "type": "CollisionShape2D",
-      "props": {
-        "shape": {
-          "primitive": "rectangle",
-          "size": [
-            200,
-            32
-          ]
-        }
-      }
-    },
-    {
-      "op": "create",
-      "parent": "Platform7",
-      "name": "Look",
-      "type": "ColorRect",
-      "props": {
-        "position": [
-          -100.0,
-          -16.0
-        ],
-        "size": [
-          200,
-          32
-        ],
-        "color": "#8a6b3c"
-      }
-    },
-    {
-      "op": "create",
-      "parent": ".",
-      "name": "Platform8",
-      "type": "StaticBody2D",
-      "props": {
-        "position": [
-          630,
-          -624
-        ]
-      }
-    },
-    {
-      "op": "create",
-      "parent": "Platform8",
-      "name": "Shape",
-      "type": "CollisionShape2D",
-      "props": {
-        "shape": {
-          "primitive": "rectangle",
-          "size": [
-            200,
-            32
-          ]
-        }
-      }
-    },
-    {
-      "op": "create",
-      "parent": "Platform8",
-      "name": "Look",
-      "type": "ColorRect",
-      "props": {
-        "position": [
-          -100.0,
-          -16.0
-        ],
-        "size": [
-          200,
-          32
-        ],
-        "color": "#8a6b3c"
-      }
-    },
-    {
-      "op": "create",
-      "parent": ".",
-      "name": "Platform9",
-      "type": "StaticBody2D",
-      "props": {
-        "position": [
-          880,
-          -784
-        ]
-      }
-    },
-    {
-      "op": "create",
-      "parent": "Platform9",
-      "name": "Shape",
-      "type": "CollisionShape2D",
-      "props": {
-        "shape": {
-          "primitive": "rectangle",
-          "size": [
-            200,
-            32
-          ]
-        }
-      }
-    },
-    {
-      "op": "create",
-      "parent": "Platform9",
-      "name": "Look",
-      "type": "ColorRect",
-      "props": {
-        "position": [
-          -100.0,
-          -16.0
-        ],
-        "size": [
-          200,
-          32
-        ],
-        "color": "#8a6b3c"
-      }
-    },
-    {
-      "op": "create",
-      "parent": ".",
-      "name": "Platform10",
-      "type": "StaticBody2D",
-      "props": {
-        "position": [
-          1130,
-          -944
-        ]
-      }
-    },
-    {
-      "op": "create",
-      "parent": "Platform10",
-      "name": "Shape",
-      "type": "CollisionShape2D",
-      "props": {
-        "shape": {
-          "primitive": "rectangle",
-          "size": [
-            200,
-            32
-          ]
-        }
-      }
-    },
-    {
-      "op": "create",
-      "parent": "Platform10",
-      "name": "Look",
-      "type": "ColorRect",
-      "props": {
-        "position": [
-          -100.0,
-          -16.0
-        ],
-        "size": [
-          200,
-          32
-        ],
-        "color": "#e0b23c"
-      }
-    },
-    {
-      "op": "create",
-      "parent": ".",
-      "name": "CoinTop",
+      "name": "Coin3",
       "type": "Area2D",
       "props": {
         "position": [
-          1130,
-          -1000
+          880,
+          124
         ],
         "script": "res://game/coin2d.gd"
       }
     },
     {
       "op": "create",
-      "parent": "CoinTop",
+      "parent": "Coin3",
       "name": "Shape",
       "type": "CollisionShape2D",
       "props": {
@@ -603,19 +356,325 @@
     },
     {
       "op": "create",
-      "parent": "CoinTop",
-      "name": "Look",
-      "type": "ColorRect",
+      "parent": ".",
+      "name": "Cloud4",
+      "type": "StaticBody2D",
       "props": {
         "position": [
-          -12,
-          -12
+          1130,
+          16
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Cloud4",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "shape": {
+          "primitive": "rectangle",
+          "size": [
+            200,
+            32
+          ]
+        },
+        "one_way_collision": true
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Cloud4",
+      "name": "Look",
+      "type": "Node2D",
+      "props": {
+        "script": "res://game/cloud2d.gd",
+        "width": 200,
+        "height": 32
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Cloud5",
+      "type": "StaticBody2D",
+      "props": {
+        "position": [
+          880,
+          -144
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Cloud5",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "shape": {
+          "primitive": "rectangle",
+          "size": [
+            200,
+            32
+          ]
+        },
+        "one_way_collision": true
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Cloud5",
+      "name": "Look",
+      "type": "Node2D",
+      "props": {
+        "script": "res://game/cloud2d.gd",
+        "width": 200,
+        "height": 32
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Cloud6",
+      "type": "StaticBody2D",
+      "props": {
+        "position": [
+          630,
+          -304
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Cloud6",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "shape": {
+          "primitive": "rectangle",
+          "size": [
+            200,
+            32
+          ]
+        },
+        "one_way_collision": true
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Cloud6",
+      "name": "Look",
+      "type": "Node2D",
+      "props": {
+        "script": "res://game/cloud2d.gd",
+        "width": 200,
+        "height": 32
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Coin6",
+      "type": "Area2D",
+      "props": {
+        "position": [
+          630,
+          -356
         ],
-        "size": [
-          24,
-          24
+        "script": "res://game/coin2d.gd"
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Coin6",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "shape": {
+          "primitive": "circle",
+          "radius": 14
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Cloud7",
+      "type": "StaticBody2D",
+      "props": {
+        "position": [
+          380,
+          -464
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Cloud7",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "shape": {
+          "primitive": "rectangle",
+          "size": [
+            200,
+            32
+          ]
+        },
+        "one_way_collision": true
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Cloud7",
+      "name": "Look",
+      "type": "Node2D",
+      "props": {
+        "script": "res://game/cloud2d.gd",
+        "width": 200,
+        "height": 32
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Cloud8",
+      "type": "StaticBody2D",
+      "props": {
+        "position": [
+          630,
+          -624
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Cloud8",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "shape": {
+          "primitive": "rectangle",
+          "size": [
+            200,
+            32
+          ]
+        },
+        "one_way_collision": true
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Cloud8",
+      "name": "Look",
+      "type": "Node2D",
+      "props": {
+        "script": "res://game/cloud2d.gd",
+        "width": 200,
+        "height": 32
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Cloud9",
+      "type": "StaticBody2D",
+      "props": {
+        "position": [
+          880,
+          -784
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Cloud9",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "shape": {
+          "primitive": "rectangle",
+          "size": [
+            200,
+            32
+          ]
+        },
+        "one_way_collision": true
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Cloud9",
+      "name": "Look",
+      "type": "Node2D",
+      "props": {
+        "script": "res://game/cloud2d.gd",
+        "width": 200,
+        "height": 32
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Coin9",
+      "type": "Area2D",
+      "props": {
+        "position": [
+          880,
+          -836
         ],
-        "color": "#ffd23c"
+        "script": "res://game/coin2d.gd"
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Coin9",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "shape": {
+          "primitive": "circle",
+          "radius": 14
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Cloud10",
+      "type": "StaticBody2D",
+      "props": {
+        "position": [
+          1130,
+          -944
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Cloud10",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "shape": {
+          "primitive": "rectangle",
+          "size": [
+            200,
+            32
+          ]
+        },
+        "one_way_collision": true
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Cloud10",
+      "name": "Look",
+      "type": "Node2D",
+      "props": {
+        "script": "res://game/cloud2d.gd",
+        "width": 200,
+        "height": 32
       }
     },
     {
@@ -652,14 +711,14 @@
       "type": "ColorRect",
       "props": {
         "position": [
-          -120.0,
-          -24.0
+          -120,
+          -24
         ],
         "size": [
           240,
           48
         ],
-        "color": "#7a7a7a"
+        "color": "#8d8d8d"
       }
     },
     {
@@ -689,19 +748,37 @@
     },
     {
       "op": "create",
-      "parent": "CoinTunnel",
-      "name": "Look",
-      "type": "ColorRect",
+      "parent": ".",
+      "name": "SunGoal",
+      "type": "Area2D",
       "props": {
         "position": [
-          -12,
-          -12
+          1130,
+          -1130
         ],
-        "size": [
-          24,
-          24
-        ],
-        "color": "#ffd23c"
+        "script": "res://game/sungoal2d.gd"
+      }
+    },
+    {
+      "op": "create",
+      "parent": "SunGoal",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "shape": {
+          "primitive": "circle",
+          "radius": 80
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": "SunGoal",
+      "name": "Look",
+      "type": "Node2D",
+      "props": {
+        "script": "res://game/sun2d.gd",
+        "radius": 60.0
       }
     },
     {
@@ -734,17 +811,9 @@
       "op": "create",
       "parent": "Player",
       "name": "Look",
-      "type": "ColorRect",
+      "type": "Node2D",
       "props": {
-        "position": [
-          -14,
-          -24
-        ],
-        "size": [
-          28,
-          48
-        ],
-        "color": "#e0453c"
+        "script": "res://game/hero2d.gd"
       }
     },
     {
@@ -755,7 +824,7 @@
       "props": {
         "position_smoothing_enabled": true,
         "limit_left": 0,
-        "limit_top": -1150,
+        "limit_top": -1300,
         "limit_right": 1280,
         "limit_bottom": 720
       }
