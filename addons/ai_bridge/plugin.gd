@@ -5,7 +5,7 @@ extends EditorPlugin
 ## Запрос: {"token": "...", "command": "doctor", "args": {}}
 ## Ответ:  {"status": "ok"|"error", "result": {...}, "errors": [], "warnings": [], "files": []}
 
-const PLUGIN_VERSION := "0.8.0"
+const PLUGIN_VERSION := "0.9.0"
 const HOST := "127.0.0.1"
 const DEFAULT_PORT := 47615
 const PORT_TRIES := 10
@@ -170,6 +170,8 @@ func _handle_line(line: String) -> Dictionary:
 			return _script_set(args)
 		"project.main_scene":
 			return _project_main_scene(args)
+		"project.refresh":
+			return _project_refresh(args)
 		"scene.undo":
 			return _scene_undo(true)
 		"scene.redo":
@@ -185,6 +187,7 @@ func _handle_line(line: String) -> Dictionary:
 #   {"op": "create", "parent": ".", "name": "Cube", "type": "MeshInstance3D", "props": {...}}
 #   {"op": "set", "path": "Cube", "props": {"position": [1, 0.5, 0]}}
 #   {"op": "delete", "path": "Cube"}
+#   {"op": "instance", "parent": ".", "name": "Car", "scene": "res://scenes/car.tscn", "props": {...}} — готовая сцена как узел
 # Значения свойств: числа, строки, bool, массивы из 2/3/4 чисел (Vector2/Vector3/Color),
 # "res://..." для ресурсов, для mesh — {"primitive": "box"|"plane"|"sphere"|"cylinder"|"capsule", ...},
 # для material — {"color": [r, g, b]} или {"color": "#rrggbb"}.
@@ -192,6 +195,8 @@ func _handle_line(line: String) -> Dictionary:
 # ---------------------------------------------------------------------------
 
 const UNDO_LABEL := "AI Bridge: scene apply"
+const BACKUP_KEEP := 20  # сколько резервных копий сцен хранить в .godot/ai_bridge/backup
+var _build_target_path := ""  # путь сцены, которую сейчас собирает scene.build (чтобы не вложить её в саму себя)
 
 
 func _scene_apply(args: Dictionary) -> Dictionary:
@@ -222,8 +227,10 @@ func _scene_apply(args: Dictionary) -> Dictionary:
 				_plan_set(i, op, root, created, deleted, plan, steps, errors)
 			"delete":
 				_plan_delete(i, op, root, created, deleted, plan, steps, errors)
+			"instance":
+				_plan_instance(i, op, root, created, deleted, plan, steps, errors)
 			_:
-				errors.append("Операция %d: неизвестный тип «%s» (ожидается create, set или delete)" % [i, kind])
+				errors.append("Операция %d: неизвестный тип «%s» (ожидается create, set, delete или instance)" % [i, kind])
 	if not errors.is_empty():
 		# Узлы, созданные для плана, но не добавленные в сцену, освобождаем.
 		for node in created.values():
@@ -286,6 +293,54 @@ func _plan_create(i: int, op: Dictionary, root: Node, created: Dictionary, delet
 	created[new_path] = node
 	steps.append({"kind": "create", "parent": parent, "node": node})
 	var entry := {"op": "create", "path": new_path, "type": type, "props": {}}
+	var props = op.get("props", {})
+	if typeof(props) != TYPE_DICTIONARY:
+		errors.append("Операция %d: props должно быть объектом" % i)
+		return
+	for prop in props:
+		var converted := _coerce(node, str(prop), props[prop])
+		if converted.has("error"):
+			errors.append("Операция %d: %s" % [i, converted["error"]])
+			continue
+		node.set(str(prop), converted["value"])
+		entry["props"][str(prop)] = _to_json(converted["value"])
+	plan.append(entry)
+
+
+## Вставка готовой сцены как узла: {"op": "instance", "parent": ".", "name": "Car", "scene": "res://scenes/car.tscn", "props": {...}}.
+## Свойства задаются корню экземпляра (позиция, поворот, @export-поля его скрипта); внутренние узлы живут в своей сцене.
+func _plan_instance(i: int, op: Dictionary, root: Node, created: Dictionary, deleted: Dictionary,
+		plan: Array, steps: Array, errors: Array) -> void:
+	var scene_path := str(op.get("scene", ""))
+	var name := str(op.get("name", scene_path.get_file().get_basename().to_pascal_case()))
+	var parent_path := str(op.get("parent", "."))
+	if name == "" or name.validate_node_name() != name:
+		errors.append("Операция %d: имя узла «%s» пустое или содержит недопустимые символы" % [i, name])
+		return
+	if not scene_path.begins_with("res://") or not FileAccess.file_exists(scene_path):
+		errors.append("Операция %d: сцена «%s» не найдена (ожидается путь res://…tscn)" % [i, scene_path])
+		return
+	if scene_path == root.scene_file_path or scene_path == _build_target_path:
+		errors.append("Операция %d: сцена не может содержать саму себя (%s)" % [i, scene_path])
+		return
+	var parent := _resolve(root, parent_path, created, deleted)
+	if parent == null:
+		errors.append("Операция %d: родитель «%s» не найден" % [i, parent_path])
+		return
+	var new_path := _join_path(root, parent, name, created)
+	if parent.has_node(name) or created.has(new_path):
+		errors.append("Операция %d: у «%s» уже есть дочерний узел «%s»" % [i, parent_path, name])
+		return
+	# Читаем с диска, а не из кэша: файл мог быть только что пересобран.
+	var packed := ResourceLoader.load(scene_path, "PackedScene", ResourceLoader.CACHE_MODE_REPLACE) as PackedScene
+	if packed == null or not packed.can_instantiate():
+		errors.append("Операция %d: «%s» не сцена или не читается" % [i, scene_path])
+		return
+	var node := packed.instantiate()
+	node.name = name
+	created[new_path] = node
+	steps.append({"kind": "create", "parent": parent, "node": node})
+	var entry := {"op": "instance", "path": new_path, "scene": scene_path, "type": node.get_class(), "props": {}}
 	var props = op.get("props", {})
 	if typeof(props) != TYPE_DICTIONARY:
 		errors.append("Операция %d: props должно быть объектом" % i)
@@ -437,14 +492,90 @@ func _coerce(node: Node, prop: String, value: Variant) -> Dictionary:
 func _load_fresh(path: String) -> Resource:
 	var res := load(path)
 	if res is Script:
-		var file := FileAccess.open(path, FileAccess.READ)
-		if file != null:
-			var text := file.get_as_text()
-			file.close()
-			if text != res.source_code:
-				res.source_code = text
-				res.reload(true)
+		_refresh_script(res)
 	return res
+
+
+## Если текст скрипта на диске отличается от загруженного, подтягивает его и перекомпилирует. true = обновлён.
+func _refresh_script(script: Script) -> bool:
+	var path := script.resource_path
+	if not path.begins_with("res://"):
+		return false
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return false
+	var text := file.get_as_text()
+	file.close()
+	if text == script.source_code:
+		return false
+	script.source_code = text
+	script.reload(true)
+	return true
+
+
+func _all_nodes(node: Node) -> Array:
+	var result: Array = [node]
+	for child in node.get_children():
+		result.append_array(_all_nodes(child))
+	return result
+
+
+## Пути открытых сцен с несохранёнными изменениями. Публичного API у редактора нет, поэтому читаем
+## заголовки вкладок сцен: несохранённая помечена «(*)». Если вкладки не нашлись, возвращаем [].
+func _unsaved_open_scenes() -> Array:
+	var open: Array = EditorInterface.get_open_scenes()
+	var by_title := {}
+	for scene_path in open:
+		by_title[str(scene_path).get_file().get_basename()] = scene_path
+	for bar in EditorInterface.get_base_control().find_children("*", "TabBar", true, false):
+		if bar.tab_count == 0:
+			continue
+		var looks_like_scene_tabs := true
+		for t in bar.tab_count:
+			var title: String = bar.get_tab_title(t).trim_suffix("(*)")
+			if not by_title.has(title) and not title.begins_with("["):
+				looks_like_scene_tabs = false
+				break
+		if not looks_like_scene_tabs:
+			continue
+		var result: Array = []
+		for t in bar.tab_count:
+			var raw: String = bar.get_tab_title(t)
+			if raw.ends_with("(*)") and by_title.has(raw.trim_suffix("(*)")):
+				result.append(by_title[raw.trim_suffix("(*)")])
+		return result
+	return []
+
+
+## Сохраняет текущее состояние открытой сцены (как она сейчас в редакторе, с несохранёнными правками)
+## в .godot/ai_bridge/backup/, чтобы перезапись файла ничего не потеряла. Возвращает путь копии или "".
+func _backup_open_scene(path: String) -> String:
+	for scene_root in EditorInterface.get_open_scene_roots():
+		if scene_root == null or scene_root.scene_file_path != path:
+			continue
+		var packed := PackedScene.new()
+		if packed.pack(scene_root) != OK:
+			return ""
+		var dir := "res://.godot/ai_bridge/backup"
+		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
+		var stamp := Time.get_datetime_string_from_system().replace(":", "-")
+		var backup := "%s/%s_%s.tscn" % [dir, path.get_file().get_basename(), stamp]
+		if ResourceSaver.save(packed, backup) == OK:
+			_prune_backups(dir, BACKUP_KEEP)
+			return backup
+		return ""
+	return ""
+
+
+## Оставляет в папке резервных копий только BACKUP_KEEP самых новых файлов (имена содержат дату, сортировка по имени).
+func _prune_backups(dir: String, keep: int) -> void:
+	var names: Array = []
+	for name in DirAccess.get_files_at(dir):
+		if name.ends_with(".tscn"):
+			names.append(name)
+	names.sort()
+	while names.size() > keep:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(dir.path_join(names.pop_front())))
 
 
 func _has_property(node: Node, prop: String) -> bool:
@@ -1000,6 +1131,7 @@ func _scene_build(args: Dictionary) -> Dictionary:
 	var steps: Array = []
 	var created: Dictionary = {}
 	var deleted: Dictionary = {}
+	_build_target_path = path
 	for i in ops.size():
 		var op = ops[i]
 		if typeof(op) != TYPE_DICTIONARY:
@@ -1011,8 +1143,11 @@ func _scene_build(args: Dictionary) -> Dictionary:
 				_plan_create(i, op, root, created, deleted, plan, steps, errors)
 			"set":
 				_plan_set(i, op, root, created, deleted, plan, steps, errors)
+			"instance":
+				_plan_instance(i, op, root, created, deleted, plan, steps, errors)
 			_:
-				errors.append("Операция %d: в новой сцене допустимы только create и set, получено «%s»" % [i, kind])
+				errors.append("Операция %d: в новой сцене допустимы только create, set и instance, получено «%s»" % [i, kind])
+	_build_target_path = ""
 	if not errors.is_empty():
 		for node in created.values():
 			node.free()
@@ -1021,6 +1156,17 @@ func _scene_build(args: Dictionary) -> Dictionary:
 		response["errors"] = errors
 		response["result"] = {"plan": plan, "scene_path": path, "built": false}
 		return response
+
+	# Перезапись открытой сцены: несохранённые ручные правки не должны пропасть.
+	var backup_path := ""
+	var was_open := path in EditorInterface.get_open_scenes()
+	if overwrite and was_open:
+		if path in _unsaved_open_scenes() and not bool(args.get("force", false)):
+			for node in created.values():
+				node.free()
+			root.free()
+			return _error("Сцена «%s» открыта в редакторе с несохранёнными изменениями: сохраните её (scene save) или закройте вкладку, либо повторите с force, тогда текущее состояние уйдёт в резервную копию" % path)
+		backup_path = _backup_open_scene(path)
 
 	# Узлы пока не в дереве: добавляем их по порядку и назначаем владельца, иначе они не попадут в файл.
 	for step in steps:
@@ -1054,11 +1200,11 @@ func _scene_build(args: Dictionary) -> Dictionary:
 
 	EditorInterface.get_resource_filesystem().scan()
 	var opened := false
+	# Если сцена уже открыта во вкладке (не обязательно текущей), её нужно перезагрузить с диска,
+	# иначе редактор покажет старое содержимое из памяти и при сохранении затрёт новый файл.
+	if overwrite and was_open:
+		EditorInterface.reload_scene_from_path(path)
 	if bool(args.get("open", true)):
-		# Если сцена уже открыта во вкладке (не обязательно текущей), её нужно перезагрузить с диска,
-		# иначе редактор покажет старое содержимое из памяти.
-		if overwrite and path in EditorInterface.get_open_scenes():
-			EditorInterface.reload_scene_from_path(path)
 		EditorInterface.open_scene_from_path(path)  # открыть или переключиться на вкладку
 		opened = true
 	var main_set := false
@@ -1071,11 +1217,58 @@ func _scene_build(args: Dictionary) -> Dictionary:
 
 	var response := _ok({"scene_path": path, "root_type": root_type, "root_name": root_name,
 		"node_count": node_count, "reread_node_count": reread_count, "built": true, "opened": opened,
-		"main_scene": main_set, "plan": plan,
-		"undo_hint": "Сцена новая, в истории Undo её нет; чтобы убрать, удалите файл %s" % path})
+		"main_scene": main_set, "backup": backup_path, "plan": plan,
+		"undo_hint": "Сцена новая, в истории Undo её нет; чтобы убрать, удалите файл %s" % path
+			if backup_path == "" else "Прежнее состояние сцены сохранено в %s" % backup_path})
 	response["warnings"] = warnings
 	response["files"] = [path] if not main_set else [path, "res://project.godot"]
 	return response
+
+
+## project.refresh: подхватить правки файлов, сделанные снаружи (ИИ, git pull), пока окно редактора без фокуса.
+## Сканирует файловую систему, перечитывает с диска скрипты узлов открытых сцен и файлы из args.files,
+## перезагружает открытые сцены без несохранённых изменений (args.reload_scenes, по умолчанию true).
+func _project_refresh(args: Dictionary) -> Dictionary:
+	EditorInterface.get_resource_filesystem().scan()
+	var reloaded_scripts: Array = []
+	var checked := {}
+	for scene_root in EditorInterface.get_open_scene_roots():
+		if scene_root == null:
+			continue
+		for node in _all_nodes(scene_root):
+			var script = node.get_script()
+			if script is Script and not checked.has(script.resource_path):
+				checked[script.resource_path] = true
+				if _refresh_script(script):
+					reloaded_scripts.append(script.resource_path)
+	var reloaded_files: Array = []
+	var files = args.get("files", [])
+	if typeof(files) != TYPE_ARRAY:
+		return _error("files должно быть списком путей res://…")
+	for f in files:
+		var file_path := str(f)
+		if not file_path.begins_with("res://") or not FileAccess.file_exists(file_path):
+			return _error("файл «%s» не найден" % file_path)
+		if not ResourceLoader.has_cached(file_path):
+			continue  # не загружен, редактор возьмёт его с диска при первом обращении
+		var res := ResourceLoader.load(file_path, "", ResourceLoader.CACHE_MODE_REPLACE)
+		if res is Script:
+			if _refresh_script(res):
+				reloaded_scripts.append(file_path)
+		elif res != null:
+			reloaded_files.append(file_path)
+	var reloaded_scenes: Array = []
+	var skipped: Array = []
+	if bool(args.get("reload_scenes", true)):
+		var unsaved := _unsaved_open_scenes()
+		for scene_path in EditorInterface.get_open_scenes():
+			if scene_path in unsaved:
+				skipped.append(scene_path)
+			else:
+				EditorInterface.reload_scene_from_path(scene_path)
+				reloaded_scenes.append(scene_path)
+	return _ok({"scanned": true, "reloaded_scripts": reloaded_scripts, "reloaded_files": reloaded_files,
+		"reloaded_scenes": reloaded_scenes, "skipped_unsaved": skipped})
 
 
 func _count_nodes(node: Node) -> int:
