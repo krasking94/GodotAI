@@ -33,6 +33,7 @@
 8. `python tools\enginectl\enginectl.py game run --scene res://scenes/car_test.tscn --seconds 60` открывает площадку с машиной: клетчатая разметка, коридор из оранжевых столбиков, четыре дома-ориентира по краям, машина — красный грузовичок Kenney (кабина спереди), в углу спидометр. W газ, S тормоз (а после остановки задний ход), A/D руль, пробел тормоз, R поставить на колёса. Камера едет следом. Через 60 секунд окно закроется само. Автозаезд для проверки без человека: добавить `--headless --test car=gas:2,left:1,brake:1`, в выводе будут строки «Машина [gas 2.0 с]: …».
 9. `python tools\enginectl\enginectl.py scene build --file tools\enginectl\examples\room.json` создаёт новую сцену `scenes/room.tscn` целиком (пол, четыре стены, лампа, камера, скрипт), сохраняет её и открывает в редакторе. `python tools\enginectl\enginectl.py game run --scene res://scenes/room.tscn --seconds 5` запускает комнату, в выводе «Комната готова: 7 объектов».
 10. `python tools\enginectl\enginectl.py game screenshot --scene res://scenes/yard.tscn --after 2` на две секунды открывает окно с игрой, сохраняет кадр в `.godot\ai_bridge\screenshot.png` и закрывает окно; в ответе путь к файлу, размер и вывод игры. ИИ открывает этот PNG, описывает, что видит, и правит сцену. Можно снимать и с самопроверкой: `--test player=goto:3:1.5;-1.2,enter:0.5,wait:9 --test car=coast:2.2,gas:1.5,coast:5 --after 2.5` даёт кадр из-за машины, в которую сел персонаж. `--out` задаёт свой файл, `--size` размер (по умолчанию 1280x720). На Linux без экрана команда сама берёт `xvfb-run` (виртуальный экран, программный OpenGL).
+11. `python tools\enginectl\enginectl.py project export --preset Windows --release` собирает игру в один файл `build\windows\GodotAI.exe`, который запускается без редактора и без ИИ (один раз нужны шаблоны экспорта: «Редактор → Управление шаблонами экспорта… → Скачать и установить»). Пресеты Windows, Linux и Android, Android-сборка и проверка на телефоне — в [docs/EXPORT.md](docs/EXPORT.md).
 
 ## Как работает «одной фразой»
 
@@ -48,4 +49,4 @@
 ## Правила
 
 - Секреты (API-ключи, пароли) в репозиторий не кладём: он открытый.
-- Готовая игра не должна требовать ИИ для запуска.
+- Готовая игра не должна требовать ИИ для запуска: `project export` собирает её в отдельный файл (см. [docs/EXPORT.md](docs/EXPORT.md)).
