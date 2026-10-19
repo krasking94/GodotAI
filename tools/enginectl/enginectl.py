@@ -339,8 +339,13 @@ def read_presets(project: Path) -> tuple[list, list]:
         example = project / EXPORT_EXAMPLE
         if not example.is_file():
             return [], [f"Нет ни {EXPORT_PRESETS}, ни примера {EXPORT_EXAMPLE}"]
-        shutil.copyfile(example, cfg_path)
-        warnings.append(f"Файла {EXPORT_PRESETS} не было, создан из примера {EXPORT_EXAMPLE} "
+        # Имя файла сборки берётся из имени папки проекта (в примере стоит GodotAI), чтобы в другом
+        # проекте игра не называлась GodotAI.exe; небуквенные имена заменяются на Game.
+        game_name = project.resolve().name
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+", game_name):
+            game_name = "Game"
+        cfg_path.write_text(example.read_text(encoding="utf-8").replace("/GodotAI.", f"/{game_name}."), encoding="utf-8")
+        warnings.append(f"Файла {EXPORT_PRESETS} не было, создан из примера {EXPORT_EXAMPLE}, файл сборки «{game_name}» "
                         "(в репозиторий он не попадает; правится в «Проект → Экспорт»)")
     parser = configparser.ConfigParser(interpolation=None, strict=False, comment_prefixes=(";", "#"))
     parser.optionxform = str  # ключи вида binary_format/architecture не приводить к нижнему регистру
@@ -561,6 +566,7 @@ SETUP_FILES = [  # что копируется: (откуда относител
     ("addons/ai_bridge/plugin.gd", "addons/ai_bridge/plugin.gd"),
     ("addons/ai_bridge/plugin.gd.uid", "addons/ai_bridge/plugin.gd.uid"),
     ("tools/enginectl/enginectl.py", "tools/enginectl/enginectl.py"),
+    ("tools/export_presets.example.cfg", "tools/export_presets.example.cfg"),  # иначе project export в новом проекте не с чего начать
     ("tools/enginectl/examples/room.json", "tools/enginectl/examples/room.json"),
     ("tools/enginectl/examples/platformer2d.json", "tools/enginectl/examples/platformer2d.json"),
     ("game/room.gd", "game/room.gd"),
