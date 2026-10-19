@@ -7,7 +7,8 @@ extends CanvasLayer
 ## так нажатие видят и опрос (Input.is_action_pressed), и обработчики событий (event.is_action_pressed),
 ## в отличие от Input.action_press, который только меняет состояние и событий не рассылает.
 ## Показывается на устройствах с сенсорным экраном, а также при запуске с аргументом --touch
-## или с --test touch=… (для снимков и проверок без телефона).
+## или с --test touch=… (для снимков и проверок без телефона). На телефоне (OS.has_feature("mobile"))
+## весь 2D-слой увеличивается по плотности экрана (content_scale_factor), чтобы кнопки были под палец.
 ## Самопроверка: game run --test touch=joy:1.5:0;-1,button:0.3:interact,show:1
 ## (joy:сек:x;y держит джойстик, button:сек:действие держит кнопку, show показывает панель, wait ждёт);
 ## после каждой фазы в выводе «Экранное управление [фаза]: персонаж …, машина …».
@@ -39,6 +40,13 @@ func _ready() -> void:
 			forced = true
 			program = arg.trim_prefix("--test-touch=")
 	visible = forced or DisplayServer.is_touchscreen_available() or OS.has_feature("mobile")
+	if OS.has_feature("mobile"):
+		# На телефоне точек на дюйм в 2–3 раза больше, чем на мониторе: без этого джойстик и кнопки
+		# были бы размером с ноготь. Множитель увеличивает весь 2D-слой (панель, подсказку, спидометр),
+		# 3D-картинка остаётся в полном разрешении.
+		var scale_factor := clampf(DisplayServer.screen_get_dpi() / 200.0, 1.0, 2.0)
+		get_window().content_scale_factor = scale_factor
+		print("Экранное управление: %d точек на дюйм, масштаб панели %.2f" % [DisplayServer.screen_get_dpi(), scale_factor])
 	_build_ui()
 	for part in program.split(",", false):
 		var fields := part.strip_edges().split(":")

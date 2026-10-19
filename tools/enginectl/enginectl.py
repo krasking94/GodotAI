@@ -1,5 +1,6 @@
-"""enginectl: отправляет команды плагину AI Bridge в открытом редакторе Godot
-и запускает игру отдельным процессом с записью вывода в лог.
+"""enginectl: отправляет команды плагину AI Bridge в открытом редакторе Godot,
+запускает игру отдельным процессом с записью вывода в лог и собирает игру
+в отдельный файл (project export).
 
 Пример:  python tools/enginectl/enginectl.py doctor
 Ответ всегда печатается как JSON. Код выхода 0, если status == "ok", иначе 1.
@@ -310,6 +311,174 @@ def write_run_info(project: Path, info: dict) -> None:
     (project / RUN_INFO).write_text(json.dumps(info, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+# ---------------------------------------------------------------------------
+# Сборка игры без редактора (экспорт)
+# ---------------------------------------------------------------------------
+
+EXPORT_PRESETS = Path("export_presets.cfg")
+EXPORT_EXAMPLE = Path("tools") / "export_presets.example.cfg"
+EXPORT_LOG = STATE_DIR / "export.log"
+# Какой файл шаблона нужен каждой платформе; {mode} — debug или release.
+TEMPLATE_FILES = {
+    "Windows Desktop": "windows_{mode}_x86_64.exe",
+    "Linux": "linux_{mode}.x86_64",
+    "Android": "android_{mode}.apk",
+}
+TEMPLATES_HINT = ("шаблоны экспорта ставятся один раз: в Godot «Редактор → Управление шаблонами экспорта… → "
+                  "Скачать и установить» (около 1,3 ГБ)")
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def read_presets(project: Path) -> tuple[list, list]:
+    """Пресеты из export_presets.cfg: [{name, platform, export_path, runnable, options}]. Если файла нет,
+    он создаётся из tools/export_presets.example.cfg; об этом сообщает предупреждение (второй элемент)."""
+    import configparser
+    warnings = []
+    cfg_path = project / EXPORT_PRESETS
+    if not cfg_path.is_file():
+        example = project / EXPORT_EXAMPLE
+        if not example.is_file():
+            return [], [f"Нет ни {EXPORT_PRESETS}, ни примера {EXPORT_EXAMPLE}"]
+        shutil.copyfile(example, cfg_path)
+        warnings.append(f"Файла {EXPORT_PRESETS} не было, создан из примера {EXPORT_EXAMPLE} "
+                        "(в репозиторий он не попадает; правится в «Проект → Экспорт»)")
+    parser = configparser.ConfigParser(interpolation=None, strict=False, comment_prefixes=(";", "#"))
+    parser.optionxform = str  # ключи вида binary_format/architecture не приводить к нижнему регистру
+    try:
+        parser.read(cfg_path, encoding="utf-8")
+    except configparser.Error as exc:
+        return [], [f"Не удалось разобрать {EXPORT_PRESETS}: {exc}"]
+
+    def unquote(value: str) -> str:
+        value = value.strip()
+        return value[1:-1] if len(value) >= 2 and value[0] == value[-1] == '"' else value
+
+    presets = []
+    for section in parser.sections():
+        match = re.fullmatch(r"preset\.(\d+)", section)
+        if not match:
+            continue
+        options = {k: unquote(v) for k, v in parser.items(f"{section}.options")} if parser.has_section(f"{section}.options") else {}
+        presets.append({"name": unquote(parser.get(section, "name", fallback="")),
+                        "platform": unquote(parser.get(section, "platform", fallback="")),
+                        "export_path": unquote(parser.get(section, "export_path", fallback="")),
+                        "runnable": unquote(parser.get(section, "runnable", fallback="true")) == "true",
+                        "options": options})
+    return presets, warnings
+
+
+def godot_version(godot: Path) -> str | None:
+    """«4.7.2.stable» из вывода `Godot --version` (4.7.2.stable.official.ed1daf0bf); None, если не удалось."""
+    try:
+        out = subprocess.run([str(godot), "--version"], capture_output=True, text=True, timeout=30).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    match = re.search(r"(\d+\.\d+(?:\.\d+)?)\.([a-z0-9]+)", out)
+    return f"{match.group(1)}.{match.group(2)}" if match else None
+
+
+def templates_dir(version: str) -> Path:
+    """Папка шаблонов экспорта Godot для этой версии (как в «Управление шаблонами экспорта»)."""
+    if os.name == "nt":
+        base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming")) / "Godot"
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support" / "Godot"
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "godot"
+    return base / "export_templates" / version
+
+
+def check_template(godot: Path, platform: str, mode: str) -> tuple[str | None, dict]:
+    """Проверяет, что для платформы установлен нужный шаблон. Возвращает (текст ошибки или None, сведения)."""
+    version = godot_version(godot)
+    info = {"godot_version": version, "templates_dir": None, "template_file": None}
+    if version is None:
+        return None, info  # версию не узнали — пусть проверяет сам Godot
+    folder = templates_dir(version)
+    info["templates_dir"] = str(folder)
+    if not folder.is_dir():
+        return f"Нет шаблонов экспорта для Godot {version} (ожидались в {folder}); {TEMPLATES_HINT}", info
+    pattern = TEMPLATE_FILES.get(platform)
+    if pattern is None:
+        return None, info
+    file = folder / pattern.format(mode=mode)
+    info["template_file"] = str(file)
+    if not file.is_file():
+        return f"Нет шаблона {file.name} для платформы «{platform}» в {folder}; {TEMPLATES_HINT}", info
+    return None, info
+
+
+def project_export(project: Path, options) -> dict:
+    presets, warnings = read_presets(project)
+    if not presets and warnings:
+        return fail(warnings[0])
+    if options.list:
+        return ok({"presets_file": str(project / EXPORT_PRESETS),
+                   "presets": [{k: p[k] for k in ("name", "platform", "export_path", "runnable")} for p in presets],
+                   "hint": "Собрать: enginectl project export --preset <имя> [--release] [--out путь]"}, warnings=warnings)
+    if not options.preset:
+        return fail("Укажите --preset <имя> (список: enginectl project export --list)")
+    preset = next((p for p in presets if p["name"] == options.preset), None)
+    if preset is None:
+        names = ", ".join(p["name"] for p in presets) or "нет ни одного"
+        return fail(f"Пресета «{options.preset}» нет в {EXPORT_PRESETS}. Есть: {names}")
+    godot = find_godot(project, options.godot)
+    if godot is None:
+        return fail("Не найден исполняемый файл Godot: откройте проект в редакторе, положите Godot в папку проекта "
+                    "или на уровень выше, задайте переменную GODOT_EXE или укажите --godot <путь>")
+    mode = "release" if options.release else "debug"
+    template_error, template_info = check_template(godot, preset["platform"], mode)
+    if template_error:
+        return fail(template_error)
+    out_text = options.out or preset["export_path"]
+    if not out_text:
+        return fail(f"У пресета «{preset['name']}» не задан путь сборки: укажите --out <файл>")
+    out = Path(out_text).expanduser()
+    if not out.is_absolute():
+        out = (Path.cwd() if options.out else project) / out
+    out.parent.mkdir(parents=True, exist_ok=True)  # Godot требует, чтобы папка уже существовала
+
+    cmd = [str(godot), "--headless", "--path", str(project), f"--export-{mode}", preset["name"], str(out)]
+    (project / STATE_DIR).mkdir(parents=True, exist_ok=True)
+    log_path = project / EXPORT_LOG
+    started = time.time()
+    try:
+        completed = subprocess.run(cmd, cwd=project, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                   timeout=options.timeout)
+    except subprocess.TimeoutExpired:
+        return fail(f"Сборка не завершилась за {options.timeout:.0f} с (см. {log_path})")
+    except OSError as exc:
+        return fail(f"Не удалось запустить Godot: {exc}")
+    duration = round(time.time() - started, 2)
+    text = ANSI_RE.sub("", completed.stdout.decode("utf-8", errors="replace"))
+    log_path.write_text(f"# enginectl project export {datetime.now():%Y-%m-%d %H:%M:%S}\n# {' '.join(cmd)}\n" + text,
+                        encoding="utf-8")
+    summary = parse_log(project, EXPORT_LOG)
+    # Строки прогресса ([ 96% ] savepack | Storing File: …) в ответе не нужны.
+    output = [line for line in summary["output"] if not re.match(r"\s*\[\s*\d+%\s*\]|\[\s*DONE\s*\]", line)]
+    if preset["platform"] != "Android":
+        # Редактор при старте проверяет Android SDK и ворчит, если его нет; к сборке для Windows это не относится.
+        output = [line for line in output if "Android" not in line]
+    result = {"preset": preset["name"], "platform": preset["platform"], "mode": mode, "path": str(out),
+              "duration": duration, "exit_code": completed.returncode, "log_path": str(log_path),
+              "output": output[-15:], **template_info}
+    errors = [e["message"] for e in summary["errors"]]
+    if completed.returncode != 0 or not out.is_file():
+        if not errors:
+            errors = [f"Сборка не удалась (код выхода {completed.returncode}), файл {out.name} не появился"]
+        if preset["platform"] == "Android" and any("SDK" in e or "keystore" in e.lower() or "Java" in e for e in errors):
+            errors.append("Для Android нужны JDK 17 и Android SDK, пути задаются в «Редактор → Настройки редактора → "
+                          "Экспорт → Android»; подробности в docs/EXPORT.md")
+        return {"status": "error", "result": result, "errors": errors,
+                "warnings": warnings + [w["message"] for w in summary["warnings"]], "files": []}
+    result["size_mb"] = round(out.stat().st_size / (1024 * 1024), 1)
+    extra = [str(p) for p in out.parent.iterdir() if p.is_file() and p != out and p.stat().st_mtime >= started - 1]
+    result["also_written"] = extra
+    result["hint"] = ("Запускается без редактора и без ИИ: откройте файл двойным щелчком"
+                      if preset["platform"] != "Android" else "Скопируйте APK на телефон и установите (docs/EXPORT.md)")
+    return ok(result, files=[str(out), *extra], warnings=warnings + [w["message"] for w in summary["warnings"]])
+
+
 def game_stop(project: Path) -> dict:
     info = read_run_info(project)
     if not info or not info.get("running"):
@@ -437,6 +606,13 @@ def build_parser() -> argparse.ArgumentParser:
     refresh = project_sub.add_parser("refresh", help="подхватить правки файлов, сделанные снаружи (ИИ, git pull): скан, скрипты с диска, перезагрузка открытых сцен")
     refresh.add_argument("--file", action="append", default=[], metavar="res://…", help="перечитать этот файл из кэша редактора (можно несколько раз)")
     refresh.add_argument("--no-scenes", action="store_true", help="не перезагружать открытые сцены")
+    export = project_sub.add_parser("export", help="собрать игру без редактора: Godot --export-debug/--export-release по пресету из export_presets.cfg")
+    export.add_argument("--preset", help="имя пресета (Windows, Linux, Android — см. --list)")
+    export.add_argument("--out", help="куда положить сборку; по умолчанию export_path пресета (относительно папки проекта)")
+    export.add_argument("--release", action="store_true", help="релизная сборка (без отладочных сообщений); по умолчанию отладочная")
+    export.add_argument("--list", action="store_true", help="показать пресеты из export_presets.cfg и ничего не собирать")
+    export.add_argument("--timeout", type=float, default=600.0, help="сколько секунд ждать сборку (по умолчанию 600)")
+    export.add_argument("--godot", help="путь к исполняемому файлу Godot, если редактор закрыт")
 
     game = sub.add_parser("game", help="запуск игры отдельным процессом Godot с записью лога")
     game_sub = game.add_subparsers(dest="game_command", required=True)
@@ -529,6 +705,8 @@ def dispatch(project: Path, options) -> dict:
     if options.command == "project":
         if options.project_command == "refresh":
             return send(project, "project.refresh", {"files": options.file, "reload_scenes": not options.no_scenes})
+        if options.project_command == "export":
+            return project_export(project, options)
         return send(project, "project.main_scene", {"path": options.path})
     if options.command == "game":
         if options.game_command == "run":

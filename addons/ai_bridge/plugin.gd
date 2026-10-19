@@ -5,7 +5,10 @@ extends EditorPlugin
 ## Запрос: {"token": "...", "command": "doctor", "args": {}}
 ## Ответ:  {"status": "ok"|"error", "result": {...}, "errors": [], "warnings": [], "files": []}
 
-const PLUGIN_VERSION := "0.9.1"
+const PLUGIN_VERSION := "0.9.2"
+## Флаги, при которых Godot запускает редактор лишь на время разовой задачи (сборка, импорт, проверка).
+const BATCH_FLAGS := ["--export-debug", "--export-release", "--export-pack", "--export-patch", "--import",
+	"--quit", "--quit-after", "--doctool", "--check-only", "--convert-3to4", "--validate-conversion-3to4"]
 const HOST := "127.0.0.1"
 const DEFAULT_PORT := 47615
 const PORT_TRIES := 10
@@ -23,6 +26,18 @@ var _selftest := {"stage": 0, "peer": null, "buffer": PackedByteArray(), "result
 
 
 func _enter_tree() -> void:
+	# Godot поднимает редактор (и плагины) и для разовых задач: --export-*, --import, --quit-after…
+	# Такой процесс живёт секунды; если он откроет порт и перепишет connection.json, файл настоящего
+	# редактора будет затёрт, а потом удалён, и enginectl потеряет связь. Поэтому в пакетном режиме молчим.
+	for arg in OS.get_cmdline_args():
+		for batch_flag in BATCH_FLAGS:
+			if arg == batch_flag or arg.begins_with(batch_flag + "="):
+				print("AI Bridge %s: пакетный режим (%s), сервер не запускаю" % [PLUGIN_VERSION, arg])
+				return
+	var other_pid := _connection_file_pid()
+	if other_pid > 0 and other_pid != OS.get_process_id() and OS.is_process_running(other_pid):
+		print("AI Bridge %s: проект уже открыт другим редактором (pid %d), этот сервер не запускаю" % [PLUGIN_VERSION, other_pid])
+		return
 	_token = _make_token()
 	for i in PORT_TRIES:
 		if _server.listen(DEFAULT_PORT + i, HOST) == OK:
@@ -42,7 +57,18 @@ func _exit_tree() -> void:
 		c.peer.disconnect_from_host()
 	_clients.clear()
 	_server.stop()
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(STATE_DIR + "/connection.json"))
+	# Удаляем только свой файл подключения: чужой (другого редактора) не трогаем.
+	if _port != 0 and _connection_file_pid() == OS.get_process_id():
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(STATE_DIR + "/connection.json"))
+
+
+## pid из существующего connection.json или 0, если файла нет или он не читается.
+func _connection_file_pid() -> int:
+	var path := ProjectSettings.globalize_path(STATE_DIR + "/connection.json")
+	if not FileAccess.file_exists(path):
+		return 0
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(path))
+	return int(parsed.get("pid", 0)) if parsed is Dictionary else 0
 
 
 func _process(_delta: float) -> void:
