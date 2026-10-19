@@ -636,6 +636,30 @@ def build_parser() -> argparse.ArgumentParser:
     game_sub.add_parser("stop", help="остановить запущенную игру")
     game_sub.add_parser("status", help="запущена ли игра и что было в последнем запуске")
 
+    task = sub.add_parser("task", help="задачи ИИ для панели «Задачи ИИ» в редакторе: объявить, закончить, отменить")
+    task_sub = task.add_subparsers(dest="task_command", required=True)
+    begin = task_sub.add_parser("begin", help="объявить задачу: заголовок и план; дальнейшие команды попадают в неё")
+    begin.add_argument("--title", required=True, help="что делает ИИ, например «Строю комнату»")
+    begin.add_argument("--plan", action="append", default=[], metavar="ШАГ", help="шаг плана (можно несколько раз)")
+    end = task_sub.add_parser("end", help="закончить текущую задачу")
+    end.add_argument("--status", choices=["ok", "error"], help="итог; без него — по ошибкам в записях")
+    end.add_argument("--note", default="", help="короткий итог для человека")
+    undo = task_sub.add_parser("undo", help="отменить задачу: история сцены, файлы в .godot/ai_bridge/trash, прежний текст скриптов")
+    undo.add_argument("--id", type=int, default=0, help="номер задачи (по умолчанию последняя)")
+    task_list = task_sub.add_parser("list", help="задачи с их записями")
+    task_list.add_argument("--limit", type=int, default=20)
+
+    journal = sub.add_parser("journal", help="журнал команд ИИ (то, что видно в панели «Задачи ИИ»)")
+    journal_sub = journal.add_subparsers(dest="journal_command", required=True)
+    journal_get = journal_sub.add_parser("get", help="последние записи журнала")
+    journal_get.add_argument("--limit", type=int, default=50)
+    journal_sub.add_parser("clear", help="очистить журнал и список задач (файлы не трогает)")
+
+    editor = sub.add_parser("editor", help="окно редактора")
+    editor_sub = editor.add_subparsers(dest="editor_command", required=True)
+    editor_shot = editor_sub.add_parser("screenshot", help="снимок окна редактора в PNG (редактор должен быть с экраном, не headless)")
+    editor_shot.add_argument("--out", default=".godot/ai_bridge/editor.png", help="куда сохранить PNG")
+
     log = sub.add_parser("log", help="лог последнего запуска игры")
     log_sub = log.add_subparsers(dest="log_command", required=True)
     log_get_cmd = log_sub.add_parser("get", help="ошибки, предупреждения и вывод последнего запуска")
@@ -706,19 +730,69 @@ def dispatch(project: Path, options) -> dict:
         if options.project_command == "refresh":
             return send(project, "project.refresh", {"files": options.file, "reload_scenes": not options.no_scenes})
         if options.project_command == "export":
-            return project_export(project, options)
+            response = project_export(project, options)
+            if not options.list:
+                result = response.get("result", {})
+                journal_notify(project, "project.export", response,
+                               f"сборка {options.preset} ({result.get('mode', '?')}): {result.get('path', '?')}"
+                               + (f", {result['size_mb']} МБ" if "size_mb" in result else ""))
+            return response
         return send(project, "project.main_scene", {"path": options.path})
     if options.command == "game":
         if options.game_command == "run":
-            return game_run(project, options)
+            response = game_run(project, options)
+            result = response.get("result", {})
+            scene = options.scene or "главная сцена"
+            if result.get("running"):
+                summary = f"игра запущена в фоне: {scene}"
+            else:
+                summary = f"игра запущена ({scene}): ошибок {len(result.get('errors', []))}, {result.get('duration', 0)} с"
+            journal_notify(project, "game.run", response, summary)
+            return response
         if options.game_command == "screenshot":
-            return game_screenshot(project, options)
+            response = game_screenshot(project, options)
+            journal_notify(project, "game.screenshot", response,
+                           f"снимок игры {options.scene or 'главной сцены'} → {response.get('result', {}).get('path', '?')}")
+            return response
         if options.game_command == "stop":
             return game_stop(project)
         return game_status(project)
     if options.command == "log":
         return log_get(project, options)
+    if options.command == "task":
+        if options.task_command == "begin":
+            return send(project, "task.begin", {"title": options.title, "plan": options.plan})
+        if options.task_command == "end":
+            args = {"note": options.note}
+            if options.status:
+                args["status"] = options.status
+            return send(project, "task.end", args)
+        if options.task_command == "undo":
+            return send(project, "task.undo", {"id": options.id})
+        return send(project, "task.list", {"limit": options.limit})
+    if options.command == "journal":
+        if options.journal_command == "clear":
+            return send(project, "journal.clear", {})
+        return send(project, "journal.get", {"limit": options.limit})
+    if options.command == "editor":
+        out = Path(options.out).expanduser()
+        if not out.is_absolute():
+            out = Path.cwd() / out
+        out.parent.mkdir(parents=True, exist_ok=True)
+        return send(project, "editor.screenshot", {"path": str(out)})
     return fail(f"Неизвестная команда {options.command}")
+
+
+def journal_notify(project: Path, command: str, response: dict, summary: str) -> None:
+    """Сообщает плагину о команде, выполненной самим enginectl (game run, screenshot, export),
+    чтобы она попала в панель «Задачи ИИ». Если редактор закрыт — молча пропускает."""
+    if read_connection(project) is None:
+        return
+    try:
+        send(project, "journal.add", {"command": command, "status": response.get("status", "error"), "summary": summary,
+                                      "files": response.get("files", []), "errors": response.get("errors", [])})
+    except (OSError, json.JSONDecodeError):
+        pass
 
 
 def print_response(response: dict) -> None:
