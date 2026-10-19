@@ -2,6 +2,8 @@ extends CharacterBody3D
 
 ## Персонаж от первого лица.
 ## Управление читается через карту действий (game/actions.gd): W A S D или стрелки — ходьба, Shift — бег,
+## Ctrl или C — присесть (персонаж вдвое ниже и медленнее, пролезает под навес; отпустил — встаёт,
+## но только если над головой свободно, иначе остаётся сидеть, пока не выйдет из-под препятствия),
 ## мышь — обзор (на телефоне — палец по правой половине экрана), пробел — прыжок,
 ## E — взаимодействие с ближайшим предметом из группы "interactables" (машина: сесть; дверь: открыть;
 ## кнопка: нажать; предмет: подобрать) или выход из машины, Esc — отпустить мышь, щелчок — захватить снова.
@@ -14,10 +16,16 @@ extends CharacterBody3D
 ## Самопроверка: test_program = "goto:4:2.5;2,interact:0.3,forward:1,enter:0.5,wait:3,exit:0.5"
 ## (фаза = имя:секунды[:аргументы]; goto идёт к точке x;z не дольше заданных секунд, interact/enter
 ## нажимают E, exit выходит из машины, forward идёт вперёд, wait ждёт, save/load/corrupt зовут узел
-## сохранений), после каждой фазы в логе «Персонаж [фаза]: …».
+## сохранений, crouch зажимает Ctrl до фазы stand), после каждой фазы в логе «Персонаж [фаза]: …».
 
 const SPEED := 4.0
 const RUN_SPEED := 8.0  # с зажатым Shift
+const CROUCH_SPEED := 2.0  # сидя (Ctrl); бег сидя не работает
+const STAND_HEIGHT := 1.8  # высота капсулы стоя (как в сцене)
+const CROUCH_HEIGHT := 1.0  # высота капсулы сидя: пролезает под препятствие от 1,1 м
+const STAND_EYE := 0.7  # камера над центром тела стоя (1,6 м над землёй)
+const CROUCH_EYE := 0.0  # камера сидя (0,9 м над землёй)
+const EYE_SPEED := 10.0  # скорость, с которой камера опускается и поднимается
 const JUMP_VELOCITY := 4.5
 const MOUSE_SENSITIVITY := 0.003
 const FALL_LIMIT_Y := -10.0  # ниже этой высоты считаем, что упал за край двора
@@ -31,6 +39,8 @@ const Actions := preload("res://game/actions.gd")
 @export var test_program := ""
 
 @onready var camera: Camera3D = $Camera
+@onready var shape_node: CollisionShape3D = $Shape
+var is_crouched := false
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var inventory: Array[String] = []
 var _start_position := Vector3.ZERO
@@ -43,6 +53,10 @@ var _phase_index := 0
 var _phase_time := 0.0
 var _test_world_dir := Vector3.ZERO  # направление ходьбы для фазы goto (в мировых осях)
 var _collision_off_frames := 0  # после телепорта столкновения включаются обратно через пару кадров физики
+var _stand_shape: CapsuleShape3D  # капсула стоя (из сцены)
+var _crouch_shape: CapsuleShape3D  # капсула сидя (ниже, ноги на том же месте)
+var _stand_blocked := false  # хотел встать, но сверху препятствие (печатается один раз)
+var _test_crouch := false  # самопроверка держит Ctrl (фаза crouch … stand)
 
 
 func _ready() -> void:
@@ -50,6 +64,14 @@ func _ready() -> void:
 	add_to_group("persist")
 	add_to_group("player")
 	_start_position = position
+	_stand_shape = shape_node.shape as CapsuleShape3D
+	if _stand_shape == null:
+		_stand_shape = CapsuleShape3D.new()
+		_stand_shape.radius = 0.4
+		_stand_shape.height = STAND_HEIGHT
+		shape_node.shape = _stand_shape
+	_crouch_shape = _stand_shape.duplicate()
+	_crouch_shape.height = CROUCH_HEIGHT
 	if not DisplayServer.is_touchscreen_available():
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	_hint = Label.new()
@@ -103,16 +125,21 @@ func _physics_process(delta: float) -> void:
 	var near := _nearest_interactable()
 	_hint.text = str(near.prompt()) if near != null and near.has_method("prompt") else ""
 
+	_update_crouch(delta)
 	if not is_on_floor():
 		velocity.y -= gravity * delta
-	elif Input.is_action_pressed("jump"):
+	elif Input.is_action_pressed("jump") and not is_crouched:
 		velocity.y = JUMP_VELOCITY
 
 	if _phases.is_empty():
 		input = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var direction := _test_world_dir if _test_world_dir != Vector3.ZERO \
 		else (transform.basis * Vector3(input.x, 0.0, input.y)).limit_length(1.0)
-	var speed := RUN_SPEED if Input.is_action_pressed("run") else SPEED
+	var speed := SPEED
+	if is_crouched:
+		speed = CROUCH_SPEED
+	elif Input.is_action_pressed("run"):
+		speed = RUN_SPEED
 	velocity.x = direction.x * speed
 	velocity.z = direction.z * speed
 	move_and_slide()
@@ -130,6 +157,48 @@ func _report_floor() -> void:
 			print("Персонаж: в машине «%s», позиция=%s" % [_car.name, position.snapped(Vector3(0.01, 0.01, 0.01))])
 		else:
 			print("Персонаж: на полу=%s, позиция=%s" % [is_on_floor(), position.snapped(Vector3(0.01, 0.01, 0.01))])
+
+
+# --- Присед (Ctrl) ----------------------------------------------------------------
+
+## Ctrl зажат — сесть; отпущен — встать, если над головой свободно.
+func _update_crouch(delta: float) -> void:
+	var wants := Input.is_action_pressed("crouch") or _test_crouch
+	if wants and not is_crouched:
+		_set_crouched(true)
+	elif not wants and is_crouched:
+		if _headroom_free():
+			_set_crouched(false)
+		elif not _stand_blocked:
+			_stand_blocked = true
+			print("Персонаж: встать нельзя, сверху препятствие")
+	var eye := CROUCH_EYE if is_crouched else STAND_EYE
+	camera.position.y = lerpf(camera.position.y, eye, 1.0 - exp(-EYE_SPEED * delta))
+
+
+## Меняет капсулу и её положение так, что ноги остаются на земле, а меняется только высота.
+func _set_crouched(crouched: bool) -> void:
+	if is_crouched == crouched:
+		return
+	is_crouched = crouched
+	_stand_blocked = false
+	shape_node.shape = _crouch_shape if crouched else _stand_shape
+	shape_node.position.y = -(STAND_HEIGHT - CROUCH_HEIGHT) * 0.5 if crouched else 0.0
+	print("Персонаж присел" if crouched else "Персонаж встал")
+
+
+## Есть ли место, чтобы встать: капсула стоя в том же месте (без нижних 10 см, чтобы не задеть пол)
+## не должна ни с чем пересекаться.
+func _headroom_free() -> bool:
+	var probe := CapsuleShape3D.new()
+	probe.radius = _stand_shape.radius
+	probe.height = STAND_HEIGHT - 0.1
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = probe
+	query.transform = Transform3D(Basis(), global_position + Vector3.UP * 0.05)
+	query.exclude = [get_rid()]
+	query.collision_mask = 1  # обычная маска персонажа: после переноса своя маска два кадра равна 0
+	return get_world_3d().direct_space_state.intersect_shape(query, 1).is_empty()
 
 
 # --- Взаимодействие (E) и инвентарь ---------------------------------------------------
@@ -175,6 +244,7 @@ func enter_car(car: Node3D) -> bool:
 	if _car != null or car == null:
 		return false
 	_car = car
+	_set_crouched(false)
 	visible = false
 	collision_layer = 0
 	collision_mask = 0
@@ -267,7 +337,8 @@ func _find_exit_spot(car: Node3D) -> Dictionary:
 
 func save_state() -> Dictionary:
 	return {"position": [global_position.x, global_position.y, global_position.z],
-		"yaw": rotation.y, "inventory": inventory.duplicate(), "car": _car.name if _car != null else ""}
+		"yaw": rotation.y, "inventory": inventory.duplicate(), "car": _car.name if _car != null else "",
+		"crouch": is_crouched}
 
 
 func load_state(state: Dictionary) -> void:
@@ -285,6 +356,7 @@ func load_state(state: Dictionary) -> void:
 	var p = state.get("position", null)
 	var target := Vector3(p[0], p[1], p[2]) if p is Array and p.size() == 3 else global_position
 	_teleport(target, float(state.get("yaw", rotation.y)))
+	_set_crouched(bool(state.get("crouch", false)))
 
 
 # --- Самопроверка ----------------------------------------------------------------
@@ -314,6 +386,10 @@ func _test_input(delta: float) -> Vector2:
 				interact_nearest()
 			"exit":
 				exit_car()
+			"crouch":
+				_test_crouch = true
+			"stand":
+				_test_crouch = false
 			"save", "load", "corrupt":
 				var manager := get_tree().get_first_node_in_group("save_manager")
 				if manager == null:
@@ -343,10 +419,12 @@ func _test_input(delta: float) -> Vector2:
 		var note := ""
 		if phase["name"] == "goto":
 			note = " (дошёл)" if finished else " (НЕ ДОШЁЛ за %.1f с)" % phase["seconds"]
+		var pose := "в машине" if _car != null else "на ногах, на полу=%s" % is_on_floor()
+		if is_crouched:
+			pose += ", присел (встать нельзя: сверху препятствие)" if _stand_blocked else ", присел"
 		print("Персонаж [%s%s %.1f с]: %s, позиция=%s%s" % [phase["name"],
 			(" " + str(phase["args"])) if str(phase["args"]) != "" else "", _phase_time,
-			"в машине" if _car != null else "на ногах, на полу=%s" % is_on_floor(),
-			global_position.snapped(Vector3(0.01, 0.01, 0.01)), note])
+			pose, global_position.snapped(Vector3(0.01, 0.01, 0.01)), note])
 		_phase_index += 1
 		_phase_time = 0.0
 		_test_world_dir = Vector3.ZERO

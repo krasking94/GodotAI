@@ -1,7 +1,7 @@
 extends CanvasLayer
 
 ## Экранное управление для телефона: слева плавающий джойстик (палец кладётся где угодно на левой
-## половине экрана), справа кнопки E, Прыжок/Тормоз, R, Бег и пауза; обзор — пальцем по правой половине
+## половине экрана), справа кнопки E, Прыжок/Тормоз, R, Бег, Сесть и пауза; обзор — пальцем по правой половине
 ## (это делает player.gd по InputEventScreenDrag). Джойстик и кнопки «нажимают действия» из game/actions.gd
 ## через Input.parse_input_event(InputEventAction), поэтому персонаж и машина не отличают их от клавиатуры:
 ## так нажатие видят и опрос (Input.is_action_pressed), и обработчики событий (event.is_action_pressed),
@@ -15,7 +15,8 @@ extends CanvasLayer
 
 const Actions := preload("res://game/actions.gd")
 const JOY_RADIUS := 90.0
-const BUTTONS := [["E", "interact"], ["Прыжок\nТормоз", "jump brake"], ["R", "flip"], ["Бег", "run"]]
+const BUTTONS := [["E", "interact"], ["Прыжок\nТормоз", "jump brake"], ["R", "flip"], ["Бег", "run"], ["Сесть", "crouch"]]
+const TOGGLE_BUTTONS := ["run", "crouch"]  # залипающие: нажал — держится, нажал ещё раз — отпустилось
 
 var _joy_base := Vector2.ZERO
 var _joy_vector := Vector2.ZERO
@@ -68,7 +69,7 @@ func _build_ui() -> void:
 	add_child(_pad)
 	var column := VBoxContainer.new()
 	column.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	column.position = Vector2(-150, -330)
+	column.position = Vector2(-150, -404)
 	column.add_theme_constant_override("separation", 10)
 	add_child(column)
 	for item in BUTTONS:
@@ -78,9 +79,9 @@ func _build_ui() -> void:
 		button.add_theme_font_size_override("font_size", 22)
 		button.focus_mode = Control.FOCUS_NONE
 		var actions: PackedStringArray = str(item[1]).split(" ")
-		if item[1] == "run":
+		if item[1] in TOGGLE_BUTTONS:
 			button.toggle_mode = true
-			button.toggled.connect(func(on: bool) -> void: _send("run", on))
+			button.toggled.connect(func(on: bool) -> void: _send(actions[0], on))
 		else:
 			button.button_down.connect(func() -> void:
 				for a in actions: _send(a, true))
