@@ -1,6 +1,7 @@
 extends VehicleBody3D
 
-## Машина на упрощённой физике Godot (VehicleBody3D: кузов + четыре VehicleWheel3D).
+## Машина на упрощённой физике Godot (VehicleBody3D: кузов + четыре VehicleWheel3D). Внешний вид — готовая модель
+## Kenney в узле Model (см. _fit_model: колёса и форма кузова подстраиваются под неё при запуске).
 ## Управление, пока active: W/S (или стрелки) — газ и задний ход, A/D — руль,
 ## пробел — тормоз, R — поставить на колёса, если перевернулась (одно нажатие, только когда лежит). Пока active выключен
 ## (водителя нет), машина стоит на ручнике; персонаж включает active, садясь в неё (клавиша E рядом: prompt/interact).
@@ -41,6 +42,7 @@ func _ready() -> void:
 	add_to_group("interactables")  # E рядом с машиной — сесть (см. prompt/interact)
 	add_to_group("persist")  # положение сохраняется в файле сохранения
 	_start_transform = global_transform
+	_fit_model()
 	_speed_label = Label.new()
 	_speed_label.add_theme_font_size_override("font_size", 32)
 	_speed_label.position = Vector2(24, 16)
@@ -144,6 +146,41 @@ func _physics_process(delta: float) -> void:
 	if global_position.y < FALL_LIMIT_Y:
 		print("Машина упала за край (была в %s), возвращаю на старт" % global_position.snapped(Vector3(0.1, 0.1, 0.1)))
 		return_to_start()
+
+
+## Подгоняет физику под 3D-модель в узле Model (glTF от Kenney: дети body, wheel-front-left, wheel-front-right,
+## wheel-back-left, wheel-back-right). Колёса модели переезжают под узлы VehicleWheel3D, которые встают на их
+## место и берут их радиус; форма столкновений кузова (Shape) становится размером с body. Без Model ничего не меняется.
+func _fit_model() -> void:
+	var model := get_node_or_null("Model") as Node3D
+	if model == null:
+		return
+	var pairs := {"WheelFL": "wheel-front-left", "WheelFR": "wheel-front-right",
+		"WheelBL": "wheel-back-left", "WheelBR": "wheel-back-right"}
+	var fitted := 0
+	for wheel_name in pairs:
+		var wheel := get_node_or_null(wheel_name) as VehicleWheel3D
+		var src := model.get_node_or_null(pairs[wheel_name]) as MeshInstance3D
+		if wheel == null or src == null:
+			continue
+		var aabb := src.get_aabb()
+		wheel.wheel_radius = aabb.size.y * 0.5 * model.scale.y
+		wheel.position = model.position + src.position * model.scale + Vector3.UP * wheel.wheel_rest_length
+		src.reparent(wheel, false)
+		src.position = Vector3.ZERO
+		src.scale = model.scale
+		fitted += 1
+	var body := model.get_node_or_null("body") as MeshInstance3D
+	var shape := get_node_or_null("Shape") as CollisionShape3D
+	if body != null and shape != null:
+		var aabb := body.get_aabb()
+		var box := BoxShape3D.new()
+		box.size = aabb.size * model.scale
+		shape.shape = box
+		shape.position = model.position + (body.position + aabb.get_center()) * model.scale
+		print("Машина: модель «%s», колёс %d, радиус %.2f м, кузов %s м" % [model.name, fitted,
+			(get_node("WheelFL") as VehicleWheel3D).wheel_radius if has_node("WheelFL") else 0.0,
+			(box.size).snapped(Vector3(0.01, 0.01, 0.01))])
 
 
 ## Возвращает машину на стартовое место (после падения за край площадки).
