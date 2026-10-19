@@ -52,7 +52,7 @@
 
 ## В новом проекте и в 2D
 
-Мост не привязан к демо. `python tools\enginectl\enginectl.py setup --target D:\МойПроект --name "Проба"` создаёт новый пустой проект Godot (или дополняет существующий): копирует плагин AI Bridge, `enginectl`, примеры `room.json` и `platformer2d.json` с их скриптами и включает плагин в `project.godot`. Дальше всё как здесь: открыть проект в Godot, `doctor`, `scene build --file tools\enginectl\examples\room.json`, `game run`. Проверено в облаке 19.10.2026: в пустом проекте собрана комната, импортирован домик Kenney (`.glb`) и вставлен в сцену, игра запущена.
+Мост не привязан к демо. `python tools\enginectl\enginectl.py setup --target D:\МойПроект --name "Проба"` создаёт новый пустой проект Godot (или дополняет существующий): копирует плагин AI Bridge, `enginectl`, примеры `room.json` и `platformer2d.json` с их скриптами, пример пресетов экспорта и включает плагин в `project.godot`; `project export` в таком проекте назовёт игру по имени папки (например `Proba.exe`). Дальше всё как здесь: открыть проект в Godot, `doctor`, `scene build --file tools\enginectl\examples\room.json`, `game run`. Проверено в облаке 19.10.2026: в пустом проекте собрана комната, импортирован домик Kenney (`.glb`) и вставлен в сцену, игра запущена.
 
 2D тоже работает: `scene build --file tools\enginectl\examples\platformer2d.json` собирает платформер (небо, земля, две платформы, монетка, персонаж с камерой) из `Node2D`, `StaticBody2D`, `CollisionShape2D` (формы `rectangle`, `circle`, `capsule`), `ColorRect`, `CharacterBody2D` со скриптом `game/player2d.gd` (стрелки — ходьба, пробел — прыжок; самопроверка `--test player2d=right:1,jump:0.8,left:1`).
 
