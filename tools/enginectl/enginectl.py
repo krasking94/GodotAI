@@ -416,6 +416,8 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("--root-type", help="тип корневого узла (по умолчанию из файла или Node3D)")
     build.add_argument("--root-name", help="имя корневого узла (по умолчанию из файла или из имени сцены)")
     build.add_argument("--overwrite", action="store_true", help="перезаписать сцену, если файл уже есть")
+    build.add_argument("--force", action="store_true",
+                       help="перезаписать даже открытую сцену с несохранёнными правками (её текущее состояние уйдёт в .godot/ai_bridge/backup)")
     build.add_argument("--main", action="store_true", help="сразу назначить сцену главной (её запускает кнопка «Запустить»)")
     build.add_argument("--no-open", action="store_true", help="не открывать сцену в редакторе после создания")
 
@@ -432,6 +434,9 @@ def build_parser() -> argparse.ArgumentParser:
     project_sub = project_cmd.add_subparsers(dest="project_command", required=True)
     main_scene = project_sub.add_parser("main-scene", help="назначить главную сцену (её запускает кнопка «Запустить»)")
     main_scene.add_argument("--path", required=True, help="например res://scenes/yard.tscn")
+    refresh = project_sub.add_parser("refresh", help="подхватить правки файлов, сделанные снаружи (ИИ, git pull): скан, скрипты с диска, перезагрузка открытых сцен")
+    refresh.add_argument("--file", action="append", default=[], metavar="res://…", help="перечитать этот файл из кэша редактора (можно несколько раз)")
+    refresh.add_argument("--no-scenes", action="store_true", help="не перезагружать открытые сцены")
 
     game = sub.add_parser("game", help="запуск игры отдельным процессом Godot с записью лога")
     game_sub = game.add_subparsers(dest="game_command", required=True)
@@ -508,7 +513,7 @@ def dispatch(project: Path, options) -> dict:
             path = options.path or scene.get("path")
             if not path:
                 return fail("Укажите, куда сохранить сцену: --path res://scenes/имя.tscn или поле scene.path в файле")
-            args = {"path": path, "ops": spec.get("ops"), "overwrite": options.overwrite,
+            args = {"path": path, "ops": spec.get("ops"), "overwrite": options.overwrite, "force": options.force,
                     "open": not options.no_open, "main_scene": options.main,
                     "root_type": options.root_type or scene.get("root_type", "Node3D")}
             root_name = options.root_name or scene.get("root_name")
@@ -522,6 +527,8 @@ def dispatch(project: Path, options) -> dict:
             args["node"] = options.node
         return send(project, "script.set", args)
     if options.command == "project":
+        if options.project_command == "refresh":
+            return send(project, "project.refresh", {"files": options.file, "reload_scenes": not options.no_scenes})
         return send(project, "project.main_scene", {"path": options.path})
     if options.command == "game":
         if options.game_command == "run":
