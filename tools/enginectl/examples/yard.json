@@ -1,5 +1,5 @@
 {
-  "phrase": "Сделай двор под открытым небом: клетчатое поле 30×30, обнесённое стенами, чтобы нельзя было уехать за край; в углу сарай с запертой дверью, ключ от неё лежит во дворе, внутри сарая кнопка, которая выключает солнце; персонаж, который ходит и бегает, и машина, в которую он садится на E; Esc открывает меню паузы, F5 сохраняет игру, F9 загружает",
+  "phrase": "Сделай двор под открытым небом: клетчатое поле 30×30, обнесённое стенами, чтобы нельзя было уехать за край; в углу сарай с запертой дверью, ключ от неё лежит во дворе, внутри сарая кнопка, которая выключает солнце; персонаж, который ходит и бегает, и машина, в которую он садится на E; Esc открывает меню паузы, F5 сохраняет игру, F9 загружает; вокруг двора домики и деревья из готовых моделей Kenney",
   "scene": {
     "path": "res://scenes/yard.tscn",
     "root_type": "Node3D",
@@ -82,7 +82,7 @@
             2,
             0.3
           ],
-          "color": "#b0b0b0"
+          "color": "#d6d6d6"
         }
       }
     },
@@ -128,7 +128,7 @@
             2,
             0.3
           ],
-          "color": "#b0b0b0"
+          "color": "#d6d6d6"
         }
       }
     },
@@ -174,7 +174,7 @@
             2,
             30
           ],
-          "color": "#b0b0b0"
+          "color": "#d6d6d6"
         }
       }
     },
@@ -220,7 +220,7 @@
             2,
             30
           ],
-          "color": "#b0b0b0"
+          "color": "#d6d6d6"
         }
       }
     },
@@ -521,7 +521,7 @@
           "sky": true,
           "sky_color": "#4a86d8",
           "horizon_color": "#b8d2f0",
-          "ambient_energy": 0.8
+          "ambient_energy": 1.3
         }
       }
     },
@@ -663,6 +663,259 @@
       "type": "CanvasLayer",
       "props": {
         "script": "res://game/pause_menu.gd"
+      }
+    },
+    {
+      "op": "instance",
+      "parent": ".",
+      "name": "HouseA",
+      "scene": "res://assets/kenney/city/building-small-a.glb",
+      "props": {
+        "position": [
+          -24,
+          0,
+          -6
+        ],
+        "rotation_degrees": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          7,
+          7,
+          7
+        ]
+      }
+    },
+    {
+      "op": "instance",
+      "parent": ".",
+      "name": "HouseB",
+      "scene": "res://assets/kenney/city/building-small-b.glb",
+      "props": {
+        "position": [
+          -24,
+          0,
+          4
+        ],
+        "rotation_degrees": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          7,
+          7,
+          7
+        ]
+      }
+    },
+    {
+      "op": "instance",
+      "parent": ".",
+      "name": "HouseC",
+      "scene": "res://assets/kenney/city/building-small-c.glb",
+      "props": {
+        "position": [
+          24,
+          0,
+          -2
+        ],
+        "rotation_degrees": [
+          0,
+          180,
+          0
+        ],
+        "scale": [
+          7,
+          7,
+          7
+        ]
+      }
+    },
+    {
+      "op": "instance",
+      "parent": ".",
+      "name": "HouseD",
+      "scene": "res://assets/kenney/city/building-small-d.glb",
+      "props": {
+        "position": [
+          8,
+          0,
+          -24
+        ],
+        "rotation_degrees": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          7,
+          7,
+          7
+        ]
+      }
+    },
+    {
+      "op": "instance",
+      "parent": ".",
+      "name": "Garage",
+      "scene": "res://assets/kenney/city/building-garage.glb",
+      "props": {
+        "position": [
+          -6,
+          0,
+          -24
+        ],
+        "rotation_degrees": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          7,
+          7,
+          7
+        ]
+      }
+    },
+    {
+      "op": "instance",
+      "parent": ".",
+      "name": "TreesNE",
+      "scene": "res://assets/kenney/city/grass-trees-tall.glb",
+      "props": {
+        "position": [
+          24,
+          0,
+          -12
+        ],
+        "rotation_degrees": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          6,
+          6,
+          6
+        ]
+      }
+    },
+    {
+      "op": "instance",
+      "parent": ".",
+      "name": "TreesSE",
+      "scene": "res://assets/kenney/city/grass-trees.glb",
+      "props": {
+        "position": [
+          24,
+          0,
+          10
+        ],
+        "rotation_degrees": [
+          0,
+          90,
+          0
+        ],
+        "scale": [
+          6,
+          6,
+          6
+        ]
+      }
+    },
+    {
+      "op": "instance",
+      "parent": ".",
+      "name": "TreesSW",
+      "scene": "res://assets/kenney/city/grass-trees-tall.glb",
+      "props": {
+        "position": [
+          -24,
+          0,
+          12
+        ],
+        "rotation_degrees": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          6,
+          6,
+          6
+        ]
+      }
+    },
+    {
+      "op": "instance",
+      "parent": ".",
+      "name": "TreesNW",
+      "scene": "res://assets/kenney/city/grass-trees.glb",
+      "props": {
+        "position": [
+          -16,
+          0,
+          -24
+        ],
+        "rotation_degrees": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          6,
+          6,
+          6
+        ]
+      }
+    },
+    {
+      "op": "instance",
+      "parent": ".",
+      "name": "TreesN",
+      "scene": "res://assets/kenney/city/grass-trees-tall.glb",
+      "props": {
+        "position": [
+          20,
+          0,
+          -24
+        ],
+        "rotation_degrees": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          6,
+          6,
+          6
+        ]
+      }
+    },
+    {
+      "op": "instance",
+      "parent": ".",
+      "name": "Fountain",
+      "scene": "res://assets/kenney/city/pavement-fountain.glb",
+      "props": {
+        "position": [
+          10,
+          0.02,
+          9
+        ],
+        "rotation_degrees": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          5,
+          5,
+          5
+        ]
       }
     },
     {
