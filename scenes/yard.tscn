@@ -23,6 +23,7 @@
 [ext_resource type="PackedScene" uid="uid://be6hh8k1ricdy" path="res://assets/kenney/city/grass-trees-tall.glb" id="20_c7pkx"]
 [ext_resource type="PackedScene" uid="uid://dpnmhcrw5wsws" path="res://assets/kenney/city/grass-trees.glb" id="21_jwolp"]
 [ext_resource type="PackedScene" uid="uid://d1n7s826waddt" path="res://assets/kenney/city/pavement-fountain.glb" id="22_aqhp8"]
+[ext_resource type="Script" uid="uid://dm1cd533rdl5r" path="res://game/touch_controls.gd" id="24_dp27a"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_inla5"]
 render_priority = 0
@@ -155,119 +156,119 @@ ambient_light_energy = 1.3
 radius = 0.4
 height = 1.8
 
-[node name="Yard" type="Node3D" unique_id=1314969383]
+[node name="Yard" type="Node3D" unique_id=408963725]
 script = ExtResource("1_e7vks")
 
-[node name="Ground" type="StaticBody3D" parent="." unique_id=1327220439]
+[node name="Ground" type="StaticBody3D" parent="." unique_id=1871948457]
 
-[node name="Mesh" type="MeshInstance3D" parent="Ground" unique_id=220496797]
+[node name="Mesh" type="MeshInstance3D" parent="Ground" unique_id=1289260184]
 mesh = SubResource("PlaneMesh_h3qbg")
 
-[node name="Shape" type="CollisionShape3D" parent="Ground" unique_id=1920153775]
+[node name="Shape" type="CollisionShape3D" parent="Ground" unique_id=571071037]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
 shape = SubResource("BoxShape3D_c7pkx")
 
-[node name="WallNorth" type="StaticBody3D" parent="." unique_id=1270407565]
+[node name="WallNorth" type="StaticBody3D" parent="." unique_id=794894581]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -15)
 
-[node name="Mesh" type="MeshInstance3D" parent="WallNorth" unique_id=627082416]
+[node name="Mesh" type="MeshInstance3D" parent="WallNorth" unique_id=693680905]
 mesh = SubResource("BoxMesh_aqhp8")
 
-[node name="Shape" type="CollisionShape3D" parent="WallNorth" unique_id=1658752108]
+[node name="Shape" type="CollisionShape3D" parent="WallNorth" unique_id=741394370]
 shape = SubResource("BoxShape3D_wo4lh")
 
-[node name="WallSouth" type="StaticBody3D" parent="." unique_id=461767243]
+[node name="WallSouth" type="StaticBody3D" parent="." unique_id=1407534196]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 15)
 
-[node name="Mesh" type="MeshInstance3D" parent="WallSouth" unique_id=89357869]
+[node name="Mesh" type="MeshInstance3D" parent="WallSouth" unique_id=620739947]
 mesh = SubResource("BoxMesh_0knqs")
 
-[node name="Shape" type="CollisionShape3D" parent="WallSouth" unique_id=1684936868]
+[node name="Shape" type="CollisionShape3D" parent="WallSouth" unique_id=2039603772]
 shape = SubResource("BoxShape3D_4iv1a")
 
-[node name="WallEast" type="StaticBody3D" parent="." unique_id=1932898083]
+[node name="WallEast" type="StaticBody3D" parent="." unique_id=1300564684]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 1, 0)
 
-[node name="Mesh" type="MeshInstance3D" parent="WallEast" unique_id=1249257200]
+[node name="Mesh" type="MeshInstance3D" parent="WallEast" unique_id=1312399232]
 mesh = SubResource("BoxMesh_xd6nr")
 
-[node name="Shape" type="CollisionShape3D" parent="WallEast" unique_id=1696146736]
+[node name="Shape" type="CollisionShape3D" parent="WallEast" unique_id=271372584]
 shape = SubResource("BoxShape3D_cpjyy")
 
-[node name="WallWest" type="StaticBody3D" parent="." unique_id=990244723]
+[node name="WallWest" type="StaticBody3D" parent="." unique_id=2016657816]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 1, 0)
 
-[node name="Mesh" type="MeshInstance3D" parent="WallWest" unique_id=600388174]
+[node name="Mesh" type="MeshInstance3D" parent="WallWest" unique_id=1320822223]
 mesh = SubResource("BoxMesh_8s3yj")
 
-[node name="Shape" type="CollisionShape3D" parent="WallWest" unique_id=2125794109]
+[node name="Shape" type="CollisionShape3D" parent="WallWest" unique_id=350195700]
 shape = SubResource("BoxShape3D_cl0d2")
 
-[node name="ShedNorth" type="StaticBody3D" parent="." unique_id=5276317]
+[node name="ShedNorth" type="StaticBody3D" parent="." unique_id=1916011560]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 1, -12)
 
-[node name="Mesh" type="MeshInstance3D" parent="ShedNorth" unique_id=537594270]
+[node name="Mesh" type="MeshInstance3D" parent="ShedNorth" unique_id=1294499282]
 mesh = SubResource("BoxMesh_m4rmd")
 
-[node name="Shape" type="CollisionShape3D" parent="ShedNorth" unique_id=968873743]
+[node name="Shape" type="CollisionShape3D" parent="ShedNorth" unique_id=1789235877]
 shape = SubResource("BoxShape3D_egmj0")
 
-[node name="ShedSouth" type="StaticBody3D" parent="." unique_id=19011556]
+[node name="ShedSouth" type="StaticBody3D" parent="." unique_id=729422471]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 1, -6)
 
-[node name="Mesh" type="MeshInstance3D" parent="ShedSouth" unique_id=258485400]
+[node name="Mesh" type="MeshInstance3D" parent="ShedSouth" unique_id=1677114561]
 mesh = SubResource("BoxMesh_6oach")
 
-[node name="Shape" type="CollisionShape3D" parent="ShedSouth" unique_id=1708984145]
+[node name="Shape" type="CollisionShape3D" parent="ShedSouth" unique_id=1644150987]
 shape = SubResource("BoxShape3D_3k1kn")
 
-[node name="ShedWest" type="StaticBody3D" parent="." unique_id=581208967]
+[node name="ShedWest" type="StaticBody3D" parent="." unique_id=1865798808]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 1, -9)
 
-[node name="Mesh" type="MeshInstance3D" parent="ShedWest" unique_id=1929455233]
+[node name="Mesh" type="MeshInstance3D" parent="ShedWest" unique_id=1275958147]
 mesh = SubResource("BoxMesh_36wff")
 
-[node name="Shape" type="CollisionShape3D" parent="ShedWest" unique_id=910184674]
+[node name="Shape" type="CollisionShape3D" parent="ShedWest" unique_id=296514593]
 shape = SubResource("BoxShape3D_vkdtb")
 
-[node name="ShedEastNorth" type="StaticBody3D" parent="." unique_id=1726881812]
+[node name="ShedEastNorth" type="StaticBody3D" parent="." unique_id=1598413617]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1, -10.8)
 
-[node name="Mesh" type="MeshInstance3D" parent="ShedEastNorth" unique_id=1857085735]
+[node name="Mesh" type="MeshInstance3D" parent="ShedEastNorth" unique_id=1871969284]
 mesh = SubResource("BoxMesh_27nqw")
 
-[node name="Shape" type="CollisionShape3D" parent="ShedEastNorth" unique_id=685343429]
+[node name="Shape" type="CollisionShape3D" parent="ShedEastNorth" unique_id=1495482090]
 shape = SubResource("BoxShape3D_lixlq")
 
-[node name="ShedEastSouth" type="StaticBody3D" parent="." unique_id=2136470222]
+[node name="ShedEastSouth" type="StaticBody3D" parent="." unique_id=1002497950]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1, -7.2)
 
-[node name="Mesh" type="MeshInstance3D" parent="ShedEastSouth" unique_id=244771567]
+[node name="Mesh" type="MeshInstance3D" parent="ShedEastSouth" unique_id=505587835]
 mesh = SubResource("BoxMesh_sbb3t")
 
-[node name="Shape" type="CollisionShape3D" parent="ShedEastSouth" unique_id=793517402]
+[node name="Shape" type="CollisionShape3D" parent="ShedEastSouth" unique_id=1058675167]
 shape = SubResource("BoxShape3D_noe4s")
 
-[node name="ShedRoof" type="MeshInstance3D" parent="." unique_id=1446928165]
+[node name="ShedRoof" type="MeshInstance3D" parent="." unique_id=1478837439]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 2.1, -9)
 mesh = SubResource("BoxMesh_h0et0")
 
-[node name="Lamp" type="DirectionalLight3D" parent="." unique_id=270430131]
+[node name="Lamp" type="DirectionalLight3D" parent="." unique_id=1796766084]
 transform = Transform3D(0.8660254, -0.38302222, 0.32139382, 0, 0.64278764, 0.76604444, -0.5, -0.66341394, 0.5566704, 0, 6, 0)
 shadow_enabled = true
 
-[node name="Sky" type="WorldEnvironment" parent="." unique_id=1127056148]
+[node name="Sky" type="WorldEnvironment" parent="." unique_id=1306561185]
 environment = SubResource("Environment_ptw7g")
 
-[node name="Player" type="CharacterBody3D" parent="." unique_id=1097410382]
+[node name="Player" type="CharacterBody3D" parent="." unique_id=2078820357]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 4)
 script = ExtResource("2_e3kx7")
 drive_camera = NodePath("../ChaseCamera")
 
-[node name="Shape" type="CollisionShape3D" parent="Player" unique_id=1931507862]
+[node name="Shape" type="CollisionShape3D" parent="Player" unique_id=1405644451]
 shape = SubResource("CapsuleShape3D_ne1rn")
 
-[node name="Camera" type="Camera3D" parent="Player" unique_id=848312699]
+[node name="Camera" type="Camera3D" parent="Player" unique_id=1904158483]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
 current = true
 
@@ -279,7 +280,7 @@ center_of_mass = Vector3(0, -0.35, 0)
 script = ExtResource("4_gkmhu")
 active = false
 
-[node name="ChaseCamera" type="Camera3D" parent="." unique_id=1770962006]
+[node name="ChaseCamera" type="Camera3D" parent="." unique_id=206037724]
 script = ExtResource("5_0xw55")
 target = NodePath("../Car")
 
@@ -297,10 +298,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 0, -11)
 script = ExtResource("12_6cedn")
 target = NodePath("../Lamp")
 
-[node name="SaveManager" type="Node" parent="." unique_id=806835160]
+[node name="SaveManager" type="Node" parent="." unique_id=451011249]
 script = ExtResource("13_bku8j")
 
-[node name="PauseMenu" type="CanvasLayer" parent="." unique_id=1956857778]
+[node name="PauseMenu" type="CanvasLayer" parent="." unique_id=405269949]
 script = ExtResource("14_abdi2")
 
 [node name="HouseA" type="Node3D" parent="." unique_id=836252246 instance=ExtResource("15_ww0r3")]
@@ -338,17 +339,17 @@ transform = Transform3D(-2.6226832e-07, 0, 6, 0, 6, 0, -6, 0, -2.6226832e-07, 24
 script = ExtResource("16_dp27a")
 solid = false
 
-[node name="TreesSW" type="Node3D" parent="." unique_id=151369941 instance=ExtResource("20_c7pkx")]
+[node name="TreesSW" type="Node3D" parent="." unique_id=1947159613 instance=ExtResource("20_c7pkx")]
 transform = Transform3D(6, 0, 0, 0, 6, 0, 0, 0, 6, -24, 0, 12)
 script = ExtResource("16_dp27a")
 solid = false
 
-[node name="TreesNW" type="Node3D" parent="." unique_id=1609022679 instance=ExtResource("21_jwolp")]
+[node name="TreesNW" type="Node3D" parent="." unique_id=17900313 instance=ExtResource("21_jwolp")]
 transform = Transform3D(6, 0, 0, 0, 6, 0, 0, 0, 6, -16, 0, -24)
 script = ExtResource("16_dp27a")
 solid = false
 
-[node name="TreesN" type="Node3D" parent="." unique_id=759263916 instance=ExtResource("20_c7pkx")]
+[node name="TreesN" type="Node3D" parent="." unique_id=1536880325 instance=ExtResource("20_c7pkx")]
 transform = Transform3D(6, 0, 0, 0, 6, 0, 0, 0, 6, 20, 0, -24)
 script = ExtResource("16_dp27a")
 solid = false
@@ -357,10 +358,13 @@ solid = false
 transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 10, 0.02, 9)
 script = ExtResource("16_dp27a")
 
-[node name="TreesYardA" type="Node3D" parent="." unique_id=1739547629 instance=ExtResource("21_jwolp")]
+[node name="TreesYardA" type="Node3D" parent="." unique_id=297704365 instance=ExtResource("21_jwolp")]
 transform = Transform3D(3.4641016, 0, 2, 0, 4, 0, -2, 0, 3.4641016, -11, 0.02, 11)
 script = ExtResource("16_dp27a")
 
-[node name="TreesYardB" type="Node3D" parent="." unique_id=2147046645 instance=ExtResource("20_c7pkx")]
+[node name="TreesYardB" type="Node3D" parent="." unique_id=1279052395 instance=ExtResource("20_c7pkx")]
 transform = Transform3D(1.9999999, 0, -3.4641018, 0, 4, 0, 3.4641018, 0, 1.9999999, 11, 0.02, -11)
 script = ExtResource("16_dp27a")
+
+[node name="TouchControls" type="CanvasLayer" parent="." unique_id=401067920]
+script = ExtResource("24_dp27a")

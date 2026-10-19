@@ -1,7 +1,8 @@
 extends CharacterBody3D
 
 ## Персонаж от первого лица.
-## Управление: W A S D (или стрелки) — ходьба, Shift — бег, мышь — обзор, пробел — прыжок,
+## Управление читается через карту действий (game/actions.gd): W A S D или стрелки — ходьба, Shift — бег,
+## мышь — обзор (на телефоне — палец по правой половине экрана), пробел — прыжок,
 ## E — взаимодействие с ближайшим предметом из группы "interactables" (машина: сесть; дверь: открыть;
 ## кнопка: нажать; предмет: подобрать) или выход из машины, Esc — отпустить мышь, щелчок — захватить снова.
 ## У каждого такого предмета есть prompt() (текст подсказки внизу экрана) и interact(player).
@@ -23,6 +24,8 @@ const FALL_LIMIT_Y := -10.0  # ниже этой высоты считаем, ч
 const REPORT_AFTER := 1.0
 const INTERACT_DISTANCE := 3.0  # метры до предмета, с которых работает E
 const GOTO_TOLERANCE := 0.35    # м: ближе этого точка goto считается достигнутой
+const TOUCH_SENSITIVITY := 0.004  # радиан на пиксель, обзор пальцем
+const Actions := preload("res://game/actions.gd")
 
 @export var drive_camera: NodePath  # камера, которая включается за рулём (иначе остаётся своя)
 @export var test_program := ""
@@ -43,9 +46,12 @@ var _collision_off_frames := 0  # после телепорта столкнов
 
 
 func _ready() -> void:
+	Actions.ensure()
 	add_to_group("persist")
+	add_to_group("player")
 	_start_position = position
-	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	if not DisplayServer.is_touchscreen_available():
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	_hint = Label.new()
 	_hint.add_theme_font_size_override("font_size", 26)
 	_hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
@@ -67,12 +73,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		rotate_y(-event.relative.x * MOUSE_SENSITIVITY)
 		camera.rotate_x(-event.relative.y * MOUSE_SENSITIVITY)
 		camera.rotation.x = clampf(camera.rotation.x, deg_to_rad(-80.0), deg_to_rad(80.0))
-	elif event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_ESCAPE:
-			Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-		elif event.keycode == KEY_E:
-			interact_nearest()
-	elif event is InputEventMouseButton and event.pressed:
+	elif event is InputEventScreenDrag and _car == null and event.position.x > get_viewport().get_visible_rect().size.x * 0.5:
+		# Телефон: палец по правой половине экрана крутит обзор (левая половина — джойстик).
+		rotate_y(-event.relative.x * TOUCH_SENSITIVITY)
+		camera.rotate_x(-event.relative.y * TOUCH_SENSITIVITY)
+		camera.rotation.x = clampf(camera.rotation.x, deg_to_rad(-80.0), deg_to_rad(80.0))
+	elif event.is_action_pressed("interact"):
+		interact_nearest()
+	elif event.is_action_pressed("pause"):
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)  # без меню паузы Esc просто отпускает мышь
+	elif event is InputEventMouseButton and event.pressed and not DisplayServer.is_touchscreen_available():
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 
@@ -95,21 +105,14 @@ func _physics_process(delta: float) -> void:
 
 	if not is_on_floor():
 		velocity.y -= gravity * delta
-	elif Input.is_physical_key_pressed(KEY_SPACE):
+	elif Input.is_action_pressed("jump"):
 		velocity.y = JUMP_VELOCITY
 
 	if _phases.is_empty():
-		if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP):
-			input.y -= 1.0
-		if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):
-			input.y += 1.0
-		if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):
-			input.x -= 1.0
-		if Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT):
-			input.x += 1.0
+		input = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var direction := _test_world_dir if _test_world_dir != Vector3.ZERO \
-		else (transform.basis * Vector3(input.x, 0.0, input.y)).normalized()
-	var speed := RUN_SPEED if Input.is_physical_key_pressed(KEY_SHIFT) else SPEED
+		else (transform.basis * Vector3(input.x, 0.0, input.y)).limit_length(1.0)
+	var speed := RUN_SPEED if Input.is_action_pressed("run") else SPEED
 	velocity.x = direction.x * speed
 	velocity.z = direction.z * speed
 	move_and_slide()

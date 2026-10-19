@@ -2,7 +2,7 @@ extends VehicleBody3D
 
 ## Машина на упрощённой физике Godot (VehicleBody3D: кузов + четыре VehicleWheel3D). Внешний вид — готовая модель
 ## Kenney в узле Model (см. _fit_model: колёса и форма кузова подстраиваются под неё при запуске).
-## Управление, пока active: W/S (или стрелки) — газ и задний ход, A/D — руль,
+## Управление читается через карту действий (game/actions.gd), пока active: W/S (или стрелки) — газ и задний ход, A/D — руль,
 ## пробел — тормоз, R — поставить на колёса, если перевернулась (одно нажатие, только когда лежит). Пока active выключен
 ## (водителя нет), машина стоит на ручнике; персонаж включает active, садясь в неё (клавиша E рядом: prompt/interact).
 ## Если машина упала ниже FALL_LIMIT_Y (уехала за край площадки), она сама возвращается на стартовое место.
@@ -22,6 +22,7 @@ const MIN_STEER := 0.18       # радианы на максимальной с�
 const STEER_SPEED := 2.5
 const REVERSE_SWITCH_SPEED := 0.8
 const FALL_LIMIT_Y := -10.0   # ниже этой высоты считаем, что машина упала за край
+const Actions := preload("res://game/actions.gd")
 
 @export var active := true
 @export var test_drive := 0.0
@@ -33,11 +34,11 @@ var _phase_time := 0.0
 var _phase_start_pos := Vector3.ZERO
 var _phase_start_yaw := 0.0
 var _speed_label: Label  # спидометр в углу экрана, виден пока active
-var _r_was_down := false  # чтобы R срабатывала по нажатию, а не пока зажата
 var _start_transform := Transform3D()  # куда вернуть машину, если упала за край
 
 
 func _ready() -> void:
+	Actions.ensure()
 	add_to_group("cars")  # по этой группе персонаж находит, куда сесть (E)
 	add_to_group("interactables")  # E рядом с машиной — сесть (см. prompt/interact)
 	add_to_group("persist")  # положение сохраняется в файле сохранения
@@ -105,28 +106,23 @@ func _physics_process(delta: float) -> void:
 			_phase_index += 1
 			_begin_phase()
 	elif active:
-		if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP):
-			gas += 1.0
-		if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):
+		gas += Input.get_action_strength("move_forward")
+		var back := Input.get_action_strength("move_back")
+		if back > 0.0:
 			if forward_speed > REVERSE_SWITCH_SPEED:
 				braking = true  # на ходу S — это тормоз
 			else:
-				gas -= 1.0
-		if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):
-			steer_input += 1.0
-		if Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT):
-			steer_input -= 1.0
-		if Input.is_physical_key_pressed(KEY_SPACE):
+				gas -= back
+		steer_input = Input.get_action_strength("move_left") - Input.get_action_strength("move_right")
+		if Input.is_action_pressed("brake"):
 			braking = true
 		# R срабатывает один раз за нажатие (а не каждый кадр, пока зажата) и только если машина
 		# действительно лежит на боку или на крыше: иначе каждый кадр подбрасывал бы её на полметра.
-		var r_down := Input.is_physical_key_pressed(KEY_R)
-		if r_down and not _r_was_down:
+		if Input.is_action_just_pressed("flip"):
 			if is_flipped():
 				flip_upright()
 			else:
 				print("Машина и так на колёсах, R не нужна")
-		_r_was_down = r_down
 	else:
 		braking = true  # без водителя машина стоит на ручнике
 

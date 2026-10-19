@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://d3s8v2eejl8n0" path="res://scenes/car.tscn" id="2_seovh"]
 [ext_resource type="Script" uid="uid://bpx6yd3c6b1pc" path="res://game/save_manager.gd" id="5_cte05"]
 [ext_resource type="Script" uid="uid://cssh2poptibyp" path="res://game/pause_menu.gd" id="6_gglpn"]
+[ext_resource type="Script" uid="uid://dm1cd533rdl5r" path="res://game/touch_controls.gd" id="7_gglpn"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_jdvc1"]
 render_priority = 0
@@ -257,156 +258,159 @@ top_radius = 0.2
 bottom_radius = 0.2
 height = 1.2
 
-[node name="CarTest" type="Node3D" unique_id=1463101044]
+[node name="CarTest" type="Node3D" unique_id=1633069194]
 
-[node name="Ground" type="StaticBody3D" parent="." unique_id=664455604]
+[node name="Ground" type="StaticBody3D" parent="." unique_id=1534127475]
 
-[node name="Mesh" type="MeshInstance3D" parent="Ground" unique_id=2109849860]
+[node name="Mesh" type="MeshInstance3D" parent="Ground" unique_id=528770958]
 mesh = SubResource("PlaneMesh_gm8sd")
 
-[node name="Shape" type="CollisionShape3D" parent="Ground" unique_id=405092117]
+[node name="Shape" type="CollisionShape3D" parent="Ground" unique_id=262970929]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
 shape = SubResource("BoxShape3D_o01lw")
 
-[node name="Lamp" type="DirectionalLight3D" parent="." unique_id=1010473082]
+[node name="Lamp" type="DirectionalLight3D" parent="." unique_id=742953665]
 transform = Transform3D(0.90630776, -0.34618863, 0.24240388, 0, 0.57357645, 0.81915206, -0.42261827, -0.74240386, 0.5198368, 0, 10, 0)
 shadow_enabled = true
 
-[node name="Sky" type="WorldEnvironment" parent="." unique_id=73800325]
+[node name="Sky" type="WorldEnvironment" parent="." unique_id=1141209141]
 environment = SubResource("Environment_gaoq8")
 
-[node name="HouseNorth" type="StaticBody3D" parent="." unique_id=1497237506]
+[node name="HouseNorth" type="StaticBody3D" parent="." unique_id=941060962]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, -90)
 
-[node name="Mesh" type="MeshInstance3D" parent="HouseNorth" unique_id=2050452842]
+[node name="Mesh" type="MeshInstance3D" parent="HouseNorth" unique_id=13112732]
 mesh = SubResource("BoxMesh_uu4pf")
 
-[node name="Shape" type="CollisionShape3D" parent="HouseNorth" unique_id=2094160836]
+[node name="Shape" type="CollisionShape3D" parent="HouseNorth" unique_id=724389561]
 shape = SubResource("BoxShape3D_wmo0b")
 
-[node name="HouseSouth" type="StaticBody3D" parent="." unique_id=911658630]
+[node name="HouseSouth" type="StaticBody3D" parent="." unique_id=1918661721]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 90)
 
-[node name="Mesh" type="MeshInstance3D" parent="HouseSouth" unique_id=1090260109]
+[node name="Mesh" type="MeshInstance3D" parent="HouseSouth" unique_id=578612034]
 mesh = SubResource("BoxMesh_x0i38")
 
-[node name="Shape" type="CollisionShape3D" parent="HouseSouth" unique_id=596075322]
+[node name="Shape" type="CollisionShape3D" parent="HouseSouth" unique_id=1046561447]
 shape = SubResource("BoxShape3D_ogjy4")
 
-[node name="HouseEast" type="StaticBody3D" parent="." unique_id=452800655]
+[node name="HouseEast" type="StaticBody3D" parent="." unique_id=1909441235]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 90, 4, 0)
 
-[node name="Mesh" type="MeshInstance3D" parent="HouseEast" unique_id=309977994]
+[node name="Mesh" type="MeshInstance3D" parent="HouseEast" unique_id=1932063924]
 mesh = SubResource("BoxMesh_j6amf")
 
-[node name="Shape" type="CollisionShape3D" parent="HouseEast" unique_id=1405958566]
+[node name="Shape" type="CollisionShape3D" parent="HouseEast" unique_id=676488943]
 shape = SubResource("BoxShape3D_hx4r4")
 
-[node name="HouseWest" type="StaticBody3D" parent="." unique_id=641691923]
+[node name="HouseWest" type="StaticBody3D" parent="." unique_id=610085805]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -90, 4, 0)
 
-[node name="Mesh" type="MeshInstance3D" parent="HouseWest" unique_id=204544382]
+[node name="Mesh" type="MeshInstance3D" parent="HouseWest" unique_id=1845358068]
 mesh = SubResource("BoxMesh_5dana")
 
-[node name="Shape" type="CollisionShape3D" parent="HouseWest" unique_id=1557668229]
+[node name="Shape" type="CollisionShape3D" parent="HouseWest" unique_id=867243322]
 shape = SubResource("BoxShape3D_yhg27")
 
-[node name="PoleL1" type="MeshInstance3D" parent="." unique_id=1723120544]
+[node name="PoleL1" type="MeshInstance3D" parent="." unique_id=1224358569]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.6, 8)
 mesh = SubResource("CylinderMesh_s80ru")
 
-[node name="PoleR1" type="MeshInstance3D" parent="." unique_id=63024847]
+[node name="PoleR1" type="MeshInstance3D" parent="." unique_id=762009741]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0.6, 8)
 mesh = SubResource("CylinderMesh_xwkem")
 
-[node name="PoleL2" type="MeshInstance3D" parent="." unique_id=233942650]
+[node name="PoleL2" type="MeshInstance3D" parent="." unique_id=1752767316]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.6, 16)
 mesh = SubResource("CylinderMesh_iksnw")
 
-[node name="PoleR2" type="MeshInstance3D" parent="." unique_id=1833253120]
+[node name="PoleR2" type="MeshInstance3D" parent="." unique_id=151987269]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0.6, 16)
 mesh = SubResource("CylinderMesh_s3iss")
 
-[node name="PoleL3" type="MeshInstance3D" parent="." unique_id=1925395071]
+[node name="PoleL3" type="MeshInstance3D" parent="." unique_id=1752053514]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.6, 24)
 mesh = SubResource("CylinderMesh_tj61x")
 
-[node name="PoleR3" type="MeshInstance3D" parent="." unique_id=455880909]
+[node name="PoleR3" type="MeshInstance3D" parent="." unique_id=667820447]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0.6, 24)
 mesh = SubResource("CylinderMesh_1bl37")
 
-[node name="PoleL4" type="MeshInstance3D" parent="." unique_id=1619795427]
+[node name="PoleL4" type="MeshInstance3D" parent="." unique_id=791811836]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.6, 32)
 mesh = SubResource("CylinderMesh_bn70g")
 
-[node name="PoleR4" type="MeshInstance3D" parent="." unique_id=389827218]
+[node name="PoleR4" type="MeshInstance3D" parent="." unique_id=1432807533]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0.6, 32)
 mesh = SubResource("CylinderMesh_532hb")
 
-[node name="PoleL5" type="MeshInstance3D" parent="." unique_id=1630148319]
+[node name="PoleL5" type="MeshInstance3D" parent="." unique_id=1137925353]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.6, 40)
 mesh = SubResource("CylinderMesh_4kdvv")
 
-[node name="PoleR5" type="MeshInstance3D" parent="." unique_id=470354342]
+[node name="PoleR5" type="MeshInstance3D" parent="." unique_id=1375835793]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0.6, 40)
 mesh = SubResource("CylinderMesh_5eoac")
 
-[node name="PoleL6" type="MeshInstance3D" parent="." unique_id=1730417734]
+[node name="PoleL6" type="MeshInstance3D" parent="." unique_id=668584612]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.6, 48)
 mesh = SubResource("CylinderMesh_wtqy6")
 
-[node name="PoleR6" type="MeshInstance3D" parent="." unique_id=587334467]
+[node name="PoleR6" type="MeshInstance3D" parent="." unique_id=1985744921]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0.6, 48)
 mesh = SubResource("CylinderMesh_k7g32")
 
-[node name="PoleL7" type="MeshInstance3D" parent="." unique_id=1455710664]
+[node name="PoleL7" type="MeshInstance3D" parent="." unique_id=831046788]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.6, 56)
 mesh = SubResource("CylinderMesh_gdbsr")
 
-[node name="PoleR7" type="MeshInstance3D" parent="." unique_id=758951687]
+[node name="PoleR7" type="MeshInstance3D" parent="." unique_id=1592977760]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0.6, 56)
 mesh = SubResource("CylinderMesh_3d3em")
 
-[node name="PoleL8" type="MeshInstance3D" parent="." unique_id=1713439015]
+[node name="PoleL8" type="MeshInstance3D" parent="." unique_id=916080763]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.6, 64)
 mesh = SubResource("CylinderMesh_kafsq")
 
-[node name="PoleR8" type="MeshInstance3D" parent="." unique_id=1542724329]
+[node name="PoleR8" type="MeshInstance3D" parent="." unique_id=1056634836]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0.6, 64)
 mesh = SubResource("CylinderMesh_pbpsl")
 
-[node name="PoleL9" type="MeshInstance3D" parent="." unique_id=909182813]
+[node name="PoleL9" type="MeshInstance3D" parent="." unique_id=285605815]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.6, 72)
 mesh = SubResource("CylinderMesh_n23o1")
 
-[node name="PoleR9" type="MeshInstance3D" parent="." unique_id=293613176]
+[node name="PoleR9" type="MeshInstance3D" parent="." unique_id=1131443923]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0.6, 72)
 mesh = SubResource("CylinderMesh_yayds")
 
-[node name="PoleL10" type="MeshInstance3D" parent="." unique_id=2081287018]
+[node name="PoleL10" type="MeshInstance3D" parent="." unique_id=1963166234]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.6, 80)
 mesh = SubResource("CylinderMesh_xohkf")
 
-[node name="PoleR10" type="MeshInstance3D" parent="." unique_id=782939802]
+[node name="PoleR10" type="MeshInstance3D" parent="." unique_id=72234913]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0.6, 80)
 mesh = SubResource("CylinderMesh_wblfk")
 
-[node name="Car" type="VehicleBody3D" parent="." unique_id=1869465986 instance=ExtResource("2_seovh")]
+[node name="Car" type="VehicleBody3D" parent="." unique_id=692302384 instance=ExtResource("2_seovh")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 mass = 800.0
 center_of_mass_mode = 1
 center_of_mass = Vector3(0, -0.35, 0)
 script = ExtResource("1_h3lgv")
 
-[node name="ChaseCamera" type="Camera3D" parent="." unique_id=893607999]
+[node name="ChaseCamera" type="Camera3D" parent="." unique_id=1288629073]
 current = true
 script = ExtResource("2_f47dj")
 target = NodePath("../Car")
 distance = 8.0
 height = 3.5
 
-[node name="SaveManager" type="Node" parent="." unique_id=648481703]
+[node name="SaveManager" type="Node" parent="." unique_id=826576360]
 script = ExtResource("5_cte05")
 
-[node name="PauseMenu" type="CanvasLayer" parent="." unique_id=425474078]
+[node name="PauseMenu" type="CanvasLayer" parent="." unique_id=477993914]
 script = ExtResource("6_gglpn")
+
+[node name="TouchControls" type="CanvasLayer" parent="." unique_id=1075078332]
+script = ExtResource("7_gglpn")
