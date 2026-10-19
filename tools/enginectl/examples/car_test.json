@@ -678,6 +678,24 @@
         "height": 3.5,
         "current": true
       }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "SaveManager",
+      "type": "Node",
+      "props": {
+        "script": "res://game/save_manager.gd"
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "PauseMenu",
+      "type": "CanvasLayer",
+      "props": {
+        "script": "res://game/pause_menu.gd"
+      }
     }
   ]
 }
