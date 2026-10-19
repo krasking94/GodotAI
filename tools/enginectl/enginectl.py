@@ -571,6 +571,8 @@ SETUP_FILES = [  # что копируется: (откуда относител
     ("tools/enginectl/examples/platformer2d.json", "tools/enginectl/examples/platformer2d.json"),
     ("game/room.gd", "game/room.gd"),
     ("game/player2d.gd", "game/player2d.gd"),
+    ("game/sun2d.gd", "game/sun2d.gd"),
+    ("game/coin2d.gd", "game/coin2d.gd"),
 ]
 PLUGIN_ENTRY = 'res://addons/ai_bridge/plugin.cfg'
 MIN_GITIGNORE = "# Служебные папки Godot\n.godot/\n.import/\nexport_presets.cfg\n\n# Сборки\nbuild/\n*.apk\n*.exe\n*.pck\n\n# Секреты\n.env\n*.keystore\n"
