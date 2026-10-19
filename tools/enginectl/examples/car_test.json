@@ -696,6 +696,15 @@
       "props": {
         "script": "res://game/pause_menu.gd"
       }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "TouchControls",
+      "type": "CanvasLayer",
+      "props": {
+        "script": "res://game/touch_controls.gd"
+      }
     }
   ]
 }

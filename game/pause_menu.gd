@@ -6,6 +6,8 @@ extends CanvasLayer
 ## Меню строится кодом, в сцене нужен только этот узел CanvasLayer со скриптом.
 ## Самопроверка: game run --test menu=open:0.5,save:0.3,load:0.3,close:0.5 (фазы open, close, save, load, quit).
 
+const Actions := preload("res://game/actions.gd")
+
 var _status: Label
 var _phases: Array = []
 var _phase_index := 0
@@ -13,6 +15,7 @@ var _phase_time := 0.0
 
 
 func _ready() -> void:
+	Actions.ensure()
 	process_mode = Node.PROCESS_MODE_ALWAYS  # меню работает, пока всё остальное стоит на паузе
 	layer = 10
 	visible = false
@@ -59,7 +62,7 @@ func _build_ui() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+	if event.is_action_pressed("pause"):
 		toggle()
 		get_viewport().set_input_as_handled()
 
@@ -104,7 +107,8 @@ func pause() -> void:
 func resume() -> void:
 	visible = false
 	get_tree().paused = false
-	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	if not DisplayServer.is_touchscreen_available():
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	print("Меню: игра продолжается")
 
 

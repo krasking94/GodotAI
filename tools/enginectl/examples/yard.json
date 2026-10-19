@@ -988,6 +988,15 @@
       }
     },
     {
+      "op": "create",
+      "parent": ".",
+      "name": "TouchControls",
+      "type": "CanvasLayer",
+      "props": {
+        "script": "res://game/touch_controls.gd"
+      }
+    },
+    {
       "op": "set",
       "path": ".",
       "props": {

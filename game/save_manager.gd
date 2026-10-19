@@ -15,6 +15,7 @@ const SAVE_PATH := "user://save.json"
 const BACKUP_PATH := "user://save.bak.json"
 const TEMP_PATH := "user://save.tmp.json"
 const FORMAT := 1  # номер формата файла; файл с другим номером не загружается
+const Actions := preload("res://game/actions.gd")
 
 var _phases: Array = []
 var _phase_index := 0
@@ -22,6 +23,7 @@ var _phase_time := 0.0
 
 
 func _ready() -> void:
+	Actions.ensure()
 	add_to_group("save_manager")
 	var prefix := "--test-save="
 	for arg in OS.get_cmdline_user_args():
@@ -33,11 +35,10 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_F5:
-			save_game()
-		elif event.keycode == KEY_F9:
-			load_game()
+	if event.is_action_pressed("save"):
+		save_game()
+	elif event.is_action_pressed("load"):
+		load_game()
 
 
 func _process(delta: float) -> void:
