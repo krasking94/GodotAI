@@ -625,6 +625,8 @@ def setup_project(source: Path, options) -> dict:
             ";   [section] ; section goes between []\n;   param=value ; assign values to parameters\n\n"
             "config_version=5\n\n[application]\n\n"
             f'config/name="{name}"\nconfig/features=PackedStringArray("4.7")\n\n'
+            "[display]\n\nwindow/size/viewport_width=1280\nwindow/size/viewport_height=720\n"
+            'window/stretch/mode="canvas_items"\nwindow/stretch/aspect="expand"\n\n'  # картинка масштабируется под окно
             f'[editor_plugins]\n\nenabled=PackedStringArray("{PLUGIN_ENTRY}")\n', encoding="utf-8")
         created_project = True
         plugin_state = "включён в новом project.godot"
