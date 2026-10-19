@@ -578,7 +578,9 @@ SETUP_FILES = [  # что копируется: (откуда относител
     ("game/sky2d.gd", "game/sky2d.gd"),
     ("game/hud2d.gd", "game/hud2d.gd"),
     ("game/sungoal2d.gd", "game/sungoal2d.gd"),
+    ("game/hero_sprite2d.gd", "game/hero_sprite2d.gd"),
 ]
+SETUP_DIRS = ["assets/kenney/platformer"]  # папки копируются целиком (кроме *.import, их создаст Godot)
 PLUGIN_ENTRY = 'res://addons/ai_bridge/plugin.cfg'
 MIN_GITIGNORE = "# Служебные папки Godot\n.godot/\n.import/\nexport_presets.cfg\n\n# Сборки\nbuild/\n*.apk\n*.exe\n*.pck\n\n# Секреты\n.env\n*.keystore\n"
 
@@ -592,12 +594,18 @@ def setup_project(source: Path, options) -> dict:
     target = target.resolve()
     if target == source.resolve():
         return fail("Это и есть исходный проект: укажите другую папку в --target")
-    missing = [src for src, _ in SETUP_FILES if not (source / src).is_file()]
+    files = list(SETUP_FILES)
+    for folder in SETUP_DIRS:
+        for path in sorted((source / folder).rglob("*")):
+            if path.is_file() and path.suffix != ".import":
+                rel = path.relative_to(source).as_posix()
+                files.append((rel, rel))
+    missing = [src for src, _ in files if not (source / src).is_file()]
     if missing:
         return fail(f"В исходном проекте {source} нет файлов: {', '.join(missing)}")
     target.mkdir(parents=True, exist_ok=True)
     copied, updated, kept = [], [], []
-    for src, dst in SETUP_FILES:
+    for src, dst in files:
         src_path, dst_path = source / src, target / dst
         if dst_path.is_file():
             if dst_path.read_bytes() == src_path.read_bytes():

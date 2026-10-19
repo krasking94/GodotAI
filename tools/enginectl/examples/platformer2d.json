@@ -26,6 +26,39 @@
     {
       "op": "create",
       "parent": ".",
+      "name": "Hills",
+      "type": "Parallax2D",
+      "props": {
+        "scroll_scale": [
+          0.4,
+          0.5
+        ],
+        "repeat_size": [
+          1024,
+          0
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Hills",
+      "name": "Image",
+      "type": "TextureRect",
+      "props": {
+        "texture": "res://assets/kenney/platformer/colored_grass.png",
+        "position": [
+          0,
+          28
+        ],
+        "size": [
+          1024,
+          1024
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
       "name": "Hud",
       "type": "CanvasLayer",
       "props": {
@@ -37,64 +70,72 @@
       "op": "create",
       "parent": ".",
       "name": "CloudFarA",
-      "type": "Node2D",
+      "type": "Sprite2D",
       "props": {
+        "texture": "res://assets/kenney/platformer/cloud2.png",
         "position": [
           240,
           330
         ],
-        "script": "res://game/cloud2d.gd",
-        "width": 260,
-        "height": 40,
-        "tint": "#e9f3ff"
+        "scale": [
+          1.3,
+          1.3
+        ],
+        "modulate": "#ffffffb0"
       }
     },
     {
       "op": "create",
       "parent": ".",
       "name": "CloudFarB",
-      "type": "Node2D",
+      "type": "Sprite2D",
       "props": {
+        "texture": "res://assets/kenney/platformer/cloud3.png",
         "position": [
           760,
           -120
         ],
-        "script": "res://game/cloud2d.gd",
-        "width": 300,
-        "height": 40,
-        "tint": "#e9f3ff"
+        "scale": [
+          1.4,
+          1.4
+        ],
+        "modulate": "#ffffffb0"
       }
     },
     {
       "op": "create",
       "parent": ".",
       "name": "CloudFarC",
-      "type": "Node2D",
+      "type": "Sprite2D",
       "props": {
+        "texture": "res://assets/kenney/platformer/cloud2.png",
         "position": [
           260,
           -620
         ],
-        "script": "res://game/cloud2d.gd",
-        "width": 280,
-        "height": 40,
-        "tint": "#e9f3ff"
+        "scale": [
+          1.2,
+          1.2
+        ],
+        "modulate": "#ffffffb0"
       }
     },
     {
       "op": "create",
       "parent": ".",
       "name": "CloudFarD",
-      "type": "Node2D",
+      "type": "Sprite2D",
       "props": {
+        "texture": "res://assets/kenney/platformer/cloud3.png",
         "position": [
           1000,
           -460
         ],
-        "script": "res://game/cloud2d.gd",
-        "width": 240,
-        "height": 40,
-        "tint": "#e9f3ff"
+        "scale": [
+          1.1,
+          1.1
+        ],
+        "modulate": "#ffffffb0"
       }
     },
     {
@@ -127,35 +168,47 @@
     {
       "op": "create",
       "parent": "Ground",
-      "name": "Look",
-      "type": "ColorRect",
+      "name": "Grass",
+      "type": "TextureRect",
       "props": {
+        "texture": "res://assets/kenney/platformer/grassMid.png",
         "position": [
           -1920,
           -300
         ],
         "size": [
-          3840,
-          600
+          7680,
+          128
         ],
-        "color": "#5c8a3c"
+        "scale": [
+          0.5,
+          0.5
+        ],
+        "stretch_mode": 1,
+        "texture_repeat": 2
       }
     },
     {
       "op": "create",
       "parent": "Ground",
-      "name": "Grass",
-      "type": "ColorRect",
+      "name": "Dirt",
+      "type": "TextureRect",
       "props": {
+        "texture": "res://assets/kenney/platformer/grassCenter.png",
         "position": [
           -1920,
-          -300
+          -236
         ],
         "size": [
-          3840,
-          14
+          7680,
+          1072
         ],
-        "color": "#7cc24f"
+        "scale": [
+          0.5,
+          0.5
+        ],
+        "stretch_mode": 1,
+        "texture_repeat": 2
       }
     },
     {
@@ -244,11 +297,17 @@
       "op": "create",
       "parent": "Cloud1",
       "name": "Look",
-      "type": "Node2D",
+      "type": "Sprite2D",
       "props": {
-        "script": "res://game/cloud2d.gd",
-        "width": 200,
-        "height": 32
+        "texture": "res://assets/kenney/platformer/cloud1.png",
+        "scale": [
+          0.9852216748768473,
+          0.9852216748768473
+        ],
+        "position": [
+          0,
+          42
+        ]
       }
     },
     {
@@ -283,11 +342,17 @@
       "op": "create",
       "parent": "Cloud2",
       "name": "Look",
-      "type": "Node2D",
+      "type": "Sprite2D",
       "props": {
-        "script": "res://game/cloud2d.gd",
-        "width": 200,
-        "height": 32
+        "texture": "res://assets/kenney/platformer/cloud3.png",
+        "scale": [
+          0.9259259259259259,
+          0.9259259259259259
+        ],
+        "position": [
+          0,
+          42
+        ]
       }
     },
     {
@@ -322,11 +387,17 @@
       "op": "create",
       "parent": "Cloud3",
       "name": "Look",
-      "type": "Node2D",
+      "type": "Sprite2D",
       "props": {
-        "script": "res://game/cloud2d.gd",
-        "width": 200,
-        "height": 32
+        "texture": "res://assets/kenney/platformer/cloud1.png",
+        "scale": [
+          0.9852216748768473,
+          0.9852216748768473
+        ],
+        "position": [
+          0,
+          42
+        ]
       }
     },
     {
@@ -352,6 +423,19 @@
           "primitive": "circle",
           "radius": 14
         }
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Coin3",
+      "name": "Look",
+      "type": "Sprite2D",
+      "props": {
+        "texture": "res://assets/kenney/platformer/coinGold.png",
+        "scale": [
+          0.45,
+          0.45
+        ]
       }
     },
     {
@@ -386,11 +470,17 @@
       "op": "create",
       "parent": "Cloud4",
       "name": "Look",
-      "type": "Node2D",
+      "type": "Sprite2D",
       "props": {
-        "script": "res://game/cloud2d.gd",
-        "width": 200,
-        "height": 32
+        "texture": "res://assets/kenney/platformer/cloud3.png",
+        "scale": [
+          0.9259259259259259,
+          0.9259259259259259
+        ],
+        "position": [
+          0,
+          42
+        ]
       }
     },
     {
@@ -425,11 +515,17 @@
       "op": "create",
       "parent": "Cloud5",
       "name": "Look",
-      "type": "Node2D",
+      "type": "Sprite2D",
       "props": {
-        "script": "res://game/cloud2d.gd",
-        "width": 200,
-        "height": 32
+        "texture": "res://assets/kenney/platformer/cloud1.png",
+        "scale": [
+          0.9852216748768473,
+          0.9852216748768473
+        ],
+        "position": [
+          0,
+          42
+        ]
       }
     },
     {
@@ -464,11 +560,17 @@
       "op": "create",
       "parent": "Cloud6",
       "name": "Look",
-      "type": "Node2D",
+      "type": "Sprite2D",
       "props": {
-        "script": "res://game/cloud2d.gd",
-        "width": 200,
-        "height": 32
+        "texture": "res://assets/kenney/platformer/cloud3.png",
+        "scale": [
+          0.9259259259259259,
+          0.9259259259259259
+        ],
+        "position": [
+          0,
+          42
+        ]
       }
     },
     {
@@ -494,6 +596,19 @@
           "primitive": "circle",
           "radius": 14
         }
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Coin6",
+      "name": "Look",
+      "type": "Sprite2D",
+      "props": {
+        "texture": "res://assets/kenney/platformer/coinGold.png",
+        "scale": [
+          0.45,
+          0.45
+        ]
       }
     },
     {
@@ -528,11 +643,17 @@
       "op": "create",
       "parent": "Cloud7",
       "name": "Look",
-      "type": "Node2D",
+      "type": "Sprite2D",
       "props": {
-        "script": "res://game/cloud2d.gd",
-        "width": 200,
-        "height": 32
+        "texture": "res://assets/kenney/platformer/cloud1.png",
+        "scale": [
+          0.9852216748768473,
+          0.9852216748768473
+        ],
+        "position": [
+          0,
+          42
+        ]
       }
     },
     {
@@ -567,11 +688,17 @@
       "op": "create",
       "parent": "Cloud8",
       "name": "Look",
-      "type": "Node2D",
+      "type": "Sprite2D",
       "props": {
-        "script": "res://game/cloud2d.gd",
-        "width": 200,
-        "height": 32
+        "texture": "res://assets/kenney/platformer/cloud3.png",
+        "scale": [
+          0.9259259259259259,
+          0.9259259259259259
+        ],
+        "position": [
+          0,
+          42
+        ]
       }
     },
     {
@@ -606,11 +733,17 @@
       "op": "create",
       "parent": "Cloud9",
       "name": "Look",
-      "type": "Node2D",
+      "type": "Sprite2D",
       "props": {
-        "script": "res://game/cloud2d.gd",
-        "width": 200,
-        "height": 32
+        "texture": "res://assets/kenney/platformer/cloud1.png",
+        "scale": [
+          0.9852216748768473,
+          0.9852216748768473
+        ],
+        "position": [
+          0,
+          42
+        ]
       }
     },
     {
@@ -636,6 +769,19 @@
           "primitive": "circle",
           "radius": 14
         }
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Coin9",
+      "name": "Look",
+      "type": "Sprite2D",
+      "props": {
+        "texture": "res://assets/kenney/platformer/coinGold.png",
+        "scale": [
+          0.45,
+          0.45
+        ]
       }
     },
     {
@@ -670,11 +816,17 @@
       "op": "create",
       "parent": "Cloud10",
       "name": "Look",
-      "type": "Node2D",
+      "type": "Sprite2D",
       "props": {
-        "script": "res://game/cloud2d.gd",
-        "width": 200,
-        "height": 32
+        "texture": "res://assets/kenney/platformer/cloud3.png",
+        "scale": [
+          0.9259259259259259,
+          0.9259259259259259
+        ],
+        "position": [
+          0,
+          42
+        ]
       }
     },
     {
@@ -708,17 +860,23 @@
       "op": "create",
       "parent": "Tunnel",
       "name": "Look",
-      "type": "ColorRect",
+      "type": "TextureRect",
       "props": {
+        "texture": "res://assets/kenney/platformer/brickGrey.png",
         "position": [
           -120,
           -24
         ],
         "size": [
-          240,
-          48
+          480,
+          96
         ],
-        "color": "#8d8d8d"
+        "scale": [
+          0.5,
+          0.5
+        ],
+        "stretch_mode": 1,
+        "texture_repeat": 2
       }
     },
     {
@@ -744,6 +902,19 @@
           "primitive": "circle",
           "radius": 14
         }
+      }
+    },
+    {
+      "op": "create",
+      "parent": "CoinTunnel",
+      "name": "Look",
+      "type": "Sprite2D",
+      "props": {
+        "texture": "res://assets/kenney/platformer/coinGold.png",
+        "scale": [
+          0.45,
+          0.45
+        ]
       }
     },
     {
@@ -811,9 +982,9 @@
       "op": "create",
       "parent": "Player",
       "name": "Look",
-      "type": "Node2D",
+      "type": "AnimatedSprite2D",
       "props": {
-        "script": "res://game/hero2d.gd"
+        "script": "res://game/hero_sprite2d.gd"
       }
     },
     {

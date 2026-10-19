@@ -4,7 +4,7 @@ extends Node2D
 ## Лежит в CanvasLayer, поэтому не двигается с камерой и перерисовывается при смене размера окна.
 
 @export var top_color := Color("#4f9cf5")
-@export var bottom_color := Color("#cfeeff")
+@export var bottom_color := Color("#d0f4f7")  # как небо на фоне Kenney colored_grass.png
 
 
 func _ready() -> void:

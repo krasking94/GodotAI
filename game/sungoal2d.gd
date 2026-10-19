@@ -15,6 +15,9 @@ func _on_body_entered(body: Node2D) -> void:
 		return
 	reached = true
 	print("Ты добрался до солнца! Победа")
+	var look := body.get_node_or_null("Look")
+	if look != null and look.has_method("cheer"):
+		look.cheer()
 	var hud := get_tree().root.find_child("Hud", true, false)  # ищем от корня: при запуске для снимка current_scene не задана
 	if hud != null and hud.has_method("show_message"):
 		hud.show_message("Ты добрался до солнца!")
