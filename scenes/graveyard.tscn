@@ -1,0 +1,23 @@
+[gd_scene format=3 uid="uid://utec20fklh3g"]
+
+[ext_resource type="Script" uid="uid://bpwhokrwmrpnm" path="res://game/gy_game.gd" id="1_7o2vs"]
+[ext_resource type="Script" uid="uid://dqakevx4ce7h2" path="res://game/gy_hero.gd" id="2_parnt"]
+[ext_resource type="Script" uid="uid://b1s2rrvxfxxq2" path="res://game/gy_hud.gd" id="3_f4ox2"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_gcky3"]
+radius = 0.4
+height = 1.8
+
+[node name="Graveyard" type="Node3D" unique_id=1184613154]
+script = ExtResource("1_7o2vs")
+
+[node name="Player" type="CharacterBody3D" parent="." unique_id=1311175767]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 0)
+script = ExtResource("2_parnt")
+
+[node name="Shape" type="CollisionShape3D" parent="Player" unique_id=265790842]
+shape = SubResource("CapsuleShape3D_gcky3")
+
+[node name="Hud" type="CanvasLayer" parent="." unique_id=1357143541]
+layer = 10
+script = ExtResource("3_f4ox2")
