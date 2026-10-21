@@ -14,19 +14,17 @@
 [ext_resource type="Texture2D" uid="uid://d1u1r2t7ivnoc" path="res://assets/kenney/platformer/cloud1.png" id="8_h5gj6"]
 [ext_resource type="Texture2D" uid="uid://cmw1r32toju5f" path="res://assets/kenney/platformer/coinGold.png" id="10_hu471"]
 [ext_resource type="Texture2D" uid="uid://r1py5indyt0u" path="res://assets/kenney/platformer/brickGrey.png" id="11_555sg"]
+[ext_resource type="Script" uid="uid://b1iabua3nleby" path="res://game/enemy2d.gd" id="11_ixald"]
 [ext_resource type="Script" uid="uid://bxck1xrjrr48q" path="res://game/hero_sprite2d.gd" id="15_o44la"]
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_gvpdj"]
-size = Vector2(3840, 600)
-
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ixald"]
-size = Vector2(40, 4000)
+size = Vector2(3840, 600)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_r5ffj"]
 size = Vector2(40, 4000)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_rlne7"]
-size = Vector2(200, 32)
+size = Vector2(40, 4000)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_3vk8h"]
 size = Vector2(200, 32)
@@ -34,11 +32,11 @@ size = Vector2(200, 32)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_h5gj6"]
 size = Vector2(200, 32)
 
-[sub_resource type="CircleShape2D" id="CircleShape2D_hu471"]
-radius = 14.0
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_555sg"]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_hu471"]
 size = Vector2(200, 32)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_555sg"]
+radius = 14.0
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_o44la"]
 size = Vector2(200, 32)
@@ -46,11 +44,11 @@ size = Vector2(200, 32)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_e538l"]
 size = Vector2(200, 32)
 
-[sub_resource type="CircleShape2D" id="CircleShape2D_v3n1i"]
-radius = 14.0
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_c1g82"]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_v3n1i"]
 size = Vector2(200, 32)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_c1g82"]
+radius = 14.0
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_rwdk0"]
 size = Vector2(200, 32)
@@ -58,78 +56,105 @@ size = Vector2(200, 32)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_qsxbd"]
 size = Vector2(200, 32)
 
-[sub_resource type="CircleShape2D" id="CircleShape2D_1jsu5"]
-radius = 14.0
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_bf3do"]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1jsu5"]
 size = Vector2(200, 32)
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_alef7"]
-size = Vector2(240, 48)
-
-[sub_resource type="CircleShape2D" id="CircleShape2D_h7fxs"]
+[sub_resource type="CircleShape2D" id="CircleShape2D_bf3do"]
 radius = 14.0
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_alef7"]
+size = Vector2(200, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_h7fxs"]
+size = Vector2(200, 32)
+
 [sub_resource type="CircleShape2D" id="CircleShape2D_uxobu"]
+radius = 14.0
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_m4f32"]
+size = Vector2(40, 28)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_rmnnv"]
+size = Vector2(200, 32)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_6e5cm"]
+radius = 14.0
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_gd2hi"]
+size = Vector2(40, 28)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_lvp54"]
+size = Vector2(36, 36)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_oq4nq"]
+size = Vector2(36, 36)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_dkdvr"]
+size = Vector2(240, 48)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_olvhf"]
+radius = 14.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_w6oop"]
 radius = 80.0
 
-[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_m4f32"]
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_30x5l"]
 radius = 14.0
 height = 48.0
 
-[node name="Platformer2D" type="Node2D" unique_id=974974748]
+[node name="Platformer2D" type="Node2D" unique_id=1420351417]
 
-[node name="Background" type="CanvasLayer" parent="." unique_id=273660000]
+[node name="Background" type="CanvasLayer" parent="." unique_id=634094278]
 layer = -10
 
-[node name="Sky" type="Node2D" parent="Background" unique_id=1809490080]
+[node name="Sky" type="Node2D" parent="Background" unique_id=1934817348]
 script = ExtResource("1_tyckj")
 
-[node name="Hills" type="Parallax2D" parent="." unique_id=435236870]
+[node name="Hills" type="Parallax2D" parent="." unique_id=2107989377]
 scroll_scale = Vector2(0.4, 0.5)
 repeat_size = Vector2(1024, 0)
 
-[node name="Image" type="TextureRect" parent="Hills" unique_id=1828243293]
+[node name="Image" type="TextureRect" parent="Hills" unique_id=569968081]
 offset_top = 28.0
 offset_right = 1024.0
 offset_bottom = 1052.0
 texture = ExtResource("2_gvpdj")
 
-[node name="Hud" type="CanvasLayer" parent="." unique_id=1897094475]
+[node name="Hud" type="CanvasLayer" parent="." unique_id=250851561]
 layer = 10
 script = ExtResource("2_xpndd")
 
-[node name="CloudFarA" type="Sprite2D" parent="." unique_id=799255698]
+[node name="CloudFarA" type="Sprite2D" parent="." unique_id=490767798]
 modulate = Color(1, 1, 1, 0.6901961)
 position = Vector2(240, 330)
 scale = Vector2(1.3, 1.3)
 texture = ExtResource("4_ixald")
 
-[node name="CloudFarB" type="Sprite2D" parent="." unique_id=722821953]
+[node name="CloudFarB" type="Sprite2D" parent="." unique_id=1662065979]
 modulate = Color(1, 1, 1, 0.6901961)
 position = Vector2(760, -120)
 scale = Vector2(1.4, 1.4)
 texture = ExtResource("5_r5ffj")
 
-[node name="CloudFarC" type="Sprite2D" parent="." unique_id=1728706433]
+[node name="CloudFarC" type="Sprite2D" parent="." unique_id=375352322]
 modulate = Color(1, 1, 1, 0.6901961)
 position = Vector2(260, -620)
 scale = Vector2(1.2, 1.2)
 texture = ExtResource("4_ixald")
 
-[node name="CloudFarD" type="Sprite2D" parent="." unique_id=1795681004]
+[node name="CloudFarD" type="Sprite2D" parent="." unique_id=130690860]
 modulate = Color(1, 1, 1, 0.6901961)
 position = Vector2(1000, -460)
 scale = Vector2(1.1, 1.1)
 texture = ExtResource("5_r5ffj")
 
-[node name="Ground" type="StaticBody2D" parent="." unique_id=1076474209]
+[node name="Ground" type="StaticBody2D" parent="." unique_id=1313780487]
 position = Vector2(640, 940)
 
-[node name="Shape" type="CollisionShape2D" parent="Ground" unique_id=61843983]
-shape = SubResource("RectangleShape2D_gvpdj")
+[node name="Shape" type="CollisionShape2D" parent="Ground" unique_id=1413506346]
+shape = SubResource("RectangleShape2D_ixald")
 
-[node name="Grass" type="TextureRect" parent="Ground" unique_id=322111903]
+[node name="Grass" type="TextureRect" parent="Ground" unique_id=935875326]
 texture_repeat = 2
 offset_left = -1920.0
 offset_top = -300.0
@@ -139,7 +164,7 @@ scale = Vector2(0.5, 0.5)
 texture = ExtResource("6_rlne7")
 stretch_mode = 1
 
-[node name="Dirt" type="TextureRect" parent="Ground" unique_id=888710470]
+[node name="Dirt" type="TextureRect" parent="Ground" unique_id=39742165]
 texture_repeat = 2
 offset_left = -1920.0
 offset_top = -236.0
@@ -149,178 +174,268 @@ scale = Vector2(0.5, 0.5)
 texture = ExtResource("7_3vk8h")
 stretch_mode = 1
 
-[node name="WallLeft" type="StaticBody2D" parent="." unique_id=2119980650]
+[node name="WallLeft" type="StaticBody2D" parent="." unique_id=752693439]
 position = Vector2(-20, 0)
 
-[node name="Shape" type="CollisionShape2D" parent="WallLeft" unique_id=1200724262]
-shape = SubResource("RectangleShape2D_ixald")
-
-[node name="WallRight" type="StaticBody2D" parent="." unique_id=1896901201]
-position = Vector2(1300, 0)
-
-[node name="Shape" type="CollisionShape2D" parent="WallRight" unique_id=1850265809]
+[node name="Shape" type="CollisionShape2D" parent="WallLeft" unique_id=636914601]
 shape = SubResource("RectangleShape2D_r5ffj")
 
-[node name="Cloud1" type="StaticBody2D" parent="." unique_id=1465385075]
+[node name="WallRight" type="StaticBody2D" parent="." unique_id=625338165]
+position = Vector2(1300, 0)
+
+[node name="Shape" type="CollisionShape2D" parent="WallRight" unique_id=80625105]
+shape = SubResource("RectangleShape2D_rlne7")
+
+[node name="Cloud1" type="StaticBody2D" parent="." unique_id=832746121]
 position = Vector2(380, 496)
 
-[node name="Shape" type="CollisionShape2D" parent="Cloud1" unique_id=1957712837]
-shape = SubResource("RectangleShape2D_rlne7")
-one_way_collision = true
-
-[node name="Look" type="Sprite2D" parent="Cloud1" unique_id=1228766449]
-position = Vector2(0, 42)
-scale = Vector2(0.9852217, 0.9852217)
-texture = ExtResource("8_h5gj6")
-
-[node name="Cloud2" type="StaticBody2D" parent="." unique_id=1284632170]
-position = Vector2(630, 336)
-
-[node name="Shape" type="CollisionShape2D" parent="Cloud2" unique_id=1959769786]
+[node name="Shape" type="CollisionShape2D" parent="Cloud1" unique_id=1599686962]
 shape = SubResource("RectangleShape2D_3vk8h")
 one_way_collision = true
 
-[node name="Look" type="Sprite2D" parent="Cloud2" unique_id=959770466]
+[node name="Look" type="Sprite2D" parent="Cloud1" unique_id=1859430976]
 position = Vector2(0, 42)
-scale = Vector2(0.9259259, 0.9259259)
-texture = ExtResource("5_r5ffj")
+scale = Vector2(0.9852217, 0.9852217)
+texture = ExtResource("8_h5gj6")
 
-[node name="Cloud3" type="StaticBody2D" parent="." unique_id=1901813401]
-position = Vector2(880, 176)
+[node name="Cloud2" type="StaticBody2D" parent="." unique_id=1316772753]
+position = Vector2(630, 336)
 
-[node name="Shape" type="CollisionShape2D" parent="Cloud3" unique_id=1415436377]
+[node name="Shape" type="CollisionShape2D" parent="Cloud2" unique_id=843554893]
 shape = SubResource("RectangleShape2D_h5gj6")
 one_way_collision = true
 
-[node name="Look" type="Sprite2D" parent="Cloud3" unique_id=726959999]
+[node name="Look" type="Sprite2D" parent="Cloud2" unique_id=1299615020]
+position = Vector2(0, 42)
+scale = Vector2(0.9259259, 0.9259259)
+texture = ExtResource("5_r5ffj")
+
+[node name="Cloud3" type="StaticBody2D" parent="." unique_id=1291676629]
+position = Vector2(880, 176)
+
+[node name="Shape" type="CollisionShape2D" parent="Cloud3" unique_id=655024776]
+shape = SubResource("RectangleShape2D_hu471")
+one_way_collision = true
+
+[node name="Look" type="Sprite2D" parent="Cloud3" unique_id=1864590508]
 position = Vector2(0, 42)
 scale = Vector2(0.9852217, 0.9852217)
 texture = ExtResource("8_h5gj6")
 
-[node name="Coin3" type="Area2D" parent="." unique_id=169295499]
+[node name="Coin3" type="Area2D" parent="." unique_id=58836768]
 position = Vector2(880, 124)
 script = ExtResource("2_d4uo0")
 
-[node name="Shape" type="CollisionShape2D" parent="Coin3" unique_id=46798244]
-shape = SubResource("CircleShape2D_hu471")
+[node name="Shape" type="CollisionShape2D" parent="Coin3" unique_id=186403744]
+shape = SubResource("CircleShape2D_555sg")
 
-[node name="Look" type="Sprite2D" parent="Coin3" unique_id=261285239]
+[node name="Look" type="Sprite2D" parent="Coin3" unique_id=674685665]
 scale = Vector2(0.45, 0.45)
 texture = ExtResource("10_hu471")
 
-[node name="Cloud4" type="StaticBody2D" parent="." unique_id=1024274956]
+[node name="Cloud4" type="StaticBody2D" parent="." unique_id=385652682]
 position = Vector2(1130, 16)
 
-[node name="Shape" type="CollisionShape2D" parent="Cloud4" unique_id=1598990891]
-shape = SubResource("RectangleShape2D_555sg")
-one_way_collision = true
-
-[node name="Look" type="Sprite2D" parent="Cloud4" unique_id=1815549960]
-position = Vector2(0, 42)
-scale = Vector2(0.9259259, 0.9259259)
-texture = ExtResource("5_r5ffj")
-
-[node name="Cloud5" type="StaticBody2D" parent="." unique_id=488992363]
-position = Vector2(880, -144)
-
-[node name="Shape" type="CollisionShape2D" parent="Cloud5" unique_id=1049397747]
+[node name="Shape" type="CollisionShape2D" parent="Cloud4" unique_id=33138691]
 shape = SubResource("RectangleShape2D_o44la")
 one_way_collision = true
 
-[node name="Look" type="Sprite2D" parent="Cloud5" unique_id=1233368460]
+[node name="Look" type="Sprite2D" parent="Cloud4" unique_id=1514108490]
 position = Vector2(0, 42)
-scale = Vector2(0.9852217, 0.9852217)
-texture = ExtResource("8_h5gj6")
+scale = Vector2(0.9259259, 0.9259259)
+texture = ExtResource("5_r5ffj")
 
-[node name="Cloud6" type="StaticBody2D" parent="." unique_id=391451737]
-position = Vector2(630, -304)
+[node name="Cloud5" type="StaticBody2D" parent="." unique_id=1820474348]
+position = Vector2(880, -144)
 
-[node name="Shape" type="CollisionShape2D" parent="Cloud6" unique_id=300297682]
+[node name="Shape" type="CollisionShape2D" parent="Cloud5" unique_id=2090224080]
 shape = SubResource("RectangleShape2D_e538l")
 one_way_collision = true
 
-[node name="Look" type="Sprite2D" parent="Cloud6" unique_id=564135590]
+[node name="Look" type="Sprite2D" parent="Cloud5" unique_id=1473425944]
+position = Vector2(0, 42)
+scale = Vector2(0.9852217, 0.9852217)
+texture = ExtResource("8_h5gj6")
+
+[node name="Cloud6" type="StaticBody2D" parent="." unique_id=431132967]
+position = Vector2(630, -304)
+
+[node name="Shape" type="CollisionShape2D" parent="Cloud6" unique_id=1604104408]
+shape = SubResource("RectangleShape2D_v3n1i")
+one_way_collision = true
+
+[node name="Look" type="Sprite2D" parent="Cloud6" unique_id=858266147]
 position = Vector2(0, 42)
 scale = Vector2(0.9259259, 0.9259259)
 texture = ExtResource("5_r5ffj")
 
-[node name="Coin6" type="Area2D" parent="." unique_id=287127674]
+[node name="Coin6" type="Area2D" parent="." unique_id=488506674]
 position = Vector2(630, -356)
 script = ExtResource("2_d4uo0")
 
-[node name="Shape" type="CollisionShape2D" parent="Coin6" unique_id=71745848]
-shape = SubResource("CircleShape2D_v3n1i")
+[node name="Shape" type="CollisionShape2D" parent="Coin6" unique_id=126404003]
+shape = SubResource("CircleShape2D_c1g82")
 
-[node name="Look" type="Sprite2D" parent="Coin6" unique_id=1120206242]
+[node name="Look" type="Sprite2D" parent="Coin6" unique_id=626826355]
 scale = Vector2(0.45, 0.45)
 texture = ExtResource("10_hu471")
 
-[node name="Cloud7" type="StaticBody2D" parent="." unique_id=1958400591]
+[node name="Cloud7" type="StaticBody2D" parent="." unique_id=105314036]
 position = Vector2(380, -464)
 
-[node name="Shape" type="CollisionShape2D" parent="Cloud7" unique_id=2043535458]
-shape = SubResource("RectangleShape2D_c1g82")
-one_way_collision = true
-
-[node name="Look" type="Sprite2D" parent="Cloud7" unique_id=1848176876]
-position = Vector2(0, 42)
-scale = Vector2(0.9852217, 0.9852217)
-texture = ExtResource("8_h5gj6")
-
-[node name="Cloud8" type="StaticBody2D" parent="." unique_id=1212520612]
-position = Vector2(630, -624)
-
-[node name="Shape" type="CollisionShape2D" parent="Cloud8" unique_id=1445934200]
+[node name="Shape" type="CollisionShape2D" parent="Cloud7" unique_id=803190635]
 shape = SubResource("RectangleShape2D_rwdk0")
 one_way_collision = true
 
-[node name="Look" type="Sprite2D" parent="Cloud8" unique_id=79945515]
-position = Vector2(0, 42)
-scale = Vector2(0.9259259, 0.9259259)
-texture = ExtResource("5_r5ffj")
-
-[node name="Cloud9" type="StaticBody2D" parent="." unique_id=610096350]
-position = Vector2(880, -784)
-
-[node name="Shape" type="CollisionShape2D" parent="Cloud9" unique_id=621722098]
-shape = SubResource("RectangleShape2D_qsxbd")
-one_way_collision = true
-
-[node name="Look" type="Sprite2D" parent="Cloud9" unique_id=498509504]
+[node name="Look" type="Sprite2D" parent="Cloud7" unique_id=1234411097]
 position = Vector2(0, 42)
 scale = Vector2(0.9852217, 0.9852217)
 texture = ExtResource("8_h5gj6")
 
-[node name="Coin9" type="Area2D" parent="." unique_id=790081222]
-position = Vector2(880, -836)
-script = ExtResource("2_d4uo0")
+[node name="Cloud8" type="StaticBody2D" parent="." unique_id=1452626980]
+position = Vector2(630, -624)
 
-[node name="Shape" type="CollisionShape2D" parent="Coin9" unique_id=950407981]
-shape = SubResource("CircleShape2D_1jsu5")
-
-[node name="Look" type="Sprite2D" parent="Coin9" unique_id=1752413194]
-scale = Vector2(0.45, 0.45)
-texture = ExtResource("10_hu471")
-
-[node name="Cloud10" type="StaticBody2D" parent="." unique_id=424383887]
-position = Vector2(1130, -944)
-
-[node name="Shape" type="CollisionShape2D" parent="Cloud10" unique_id=28148014]
-shape = SubResource("RectangleShape2D_bf3do")
+[node name="Shape" type="CollisionShape2D" parent="Cloud8" unique_id=1603868028]
+shape = SubResource("RectangleShape2D_qsxbd")
 one_way_collision = true
 
-[node name="Look" type="Sprite2D" parent="Cloud10" unique_id=669773976]
+[node name="Look" type="Sprite2D" parent="Cloud8" unique_id=817087672]
 position = Vector2(0, 42)
 scale = Vector2(0.9259259, 0.9259259)
 texture = ExtResource("5_r5ffj")
 
-[node name="Tunnel" type="StaticBody2D" parent="." unique_id=916136952]
+[node name="Cloud9" type="StaticBody2D" parent="." unique_id=1510076433]
+position = Vector2(880, -784)
+
+[node name="Shape" type="CollisionShape2D" parent="Cloud9" unique_id=978396847]
+shape = SubResource("RectangleShape2D_1jsu5")
+one_way_collision = true
+
+[node name="Look" type="Sprite2D" parent="Cloud9" unique_id=929017241]
+position = Vector2(0, 42)
+scale = Vector2(0.9852217, 0.9852217)
+texture = ExtResource("8_h5gj6")
+
+[node name="Coin9" type="Area2D" parent="." unique_id=743910552]
+position = Vector2(880, -836)
+script = ExtResource("2_d4uo0")
+
+[node name="Shape" type="CollisionShape2D" parent="Coin9" unique_id=876959514]
+shape = SubResource("CircleShape2D_bf3do")
+
+[node name="Look" type="Sprite2D" parent="Coin9" unique_id=1948610846]
+scale = Vector2(0.45, 0.45)
+texture = ExtResource("10_hu471")
+
+[node name="Cloud10" type="StaticBody2D" parent="." unique_id=401782134]
+position = Vector2(1130, -944)
+
+[node name="Shape" type="CollisionShape2D" parent="Cloud10" unique_id=345429373]
+shape = SubResource("RectangleShape2D_alef7")
+one_way_collision = true
+
+[node name="Look" type="Sprite2D" parent="Cloud10" unique_id=1797543802]
+position = Vector2(0, 42)
+scale = Vector2(0.9259259, 0.9259259)
+texture = ExtResource("5_r5ffj")
+
+[node name="CloudSideA" type="StaticBody2D" parent="." unique_id=974409974]
+position = Vector2(130, 380)
+
+[node name="Shape" type="CollisionShape2D" parent="CloudSideA" unique_id=1655814020]
+shape = SubResource("RectangleShape2D_h7fxs")
+one_way_collision = true
+
+[node name="Look" type="Sprite2D" parent="CloudSideA" unique_id=789166120]
+position = Vector2(0, 42)
+scale = Vector2(0.9259259, 0.9259259)
+texture = ExtResource("5_r5ffj")
+
+[node name="CoinSideA" type="Area2D" parent="." unique_id=1666719604]
+position = Vector2(130, 328)
+script = ExtResource("2_d4uo0")
+
+[node name="Shape" type="CollisionShape2D" parent="CoinSideA" unique_id=27890502]
+shape = SubResource("CircleShape2D_uxobu")
+
+[node name="Look" type="Sprite2D" parent="CoinSideA" unique_id=836428616]
+scale = Vector2(0.45, 0.45)
+texture = ExtResource("10_hu471")
+
+[node name="SlimeA" type="Area2D" parent="." unique_id=1893138563]
+position = Vector2(85, 332)
+script = ExtResource("11_ixald")
+patrol = 45.0
+
+[node name="Shape" type="CollisionShape2D" parent="SlimeA" unique_id=159057179]
+position = Vector2(0, 17)
+shape = SubResource("RectangleShape2D_m4f32")
+
+[node name="CloudSideB" type="StaticBody2D" parent="." unique_id=1336876154]
+position = Vector2(130, -260)
+
+[node name="Shape" type="CollisionShape2D" parent="CloudSideB" unique_id=1144381907]
+shape = SubResource("RectangleShape2D_rmnnv")
+one_way_collision = true
+
+[node name="Look" type="Sprite2D" parent="CloudSideB" unique_id=2023662937]
+position = Vector2(0, 42)
+scale = Vector2(0.9852217, 0.9852217)
+texture = ExtResource("8_h5gj6")
+
+[node name="CoinSideB" type="Area2D" parent="." unique_id=536235519]
+position = Vector2(130, -312)
+script = ExtResource("2_d4uo0")
+
+[node name="Shape" type="CollisionShape2D" parent="CoinSideB" unique_id=2040152236]
+shape = SubResource("CircleShape2D_6e5cm")
+
+[node name="Look" type="Sprite2D" parent="CoinSideB" unique_id=953979419]
+scale = Vector2(0.45, 0.45)
+texture = ExtResource("10_hu471")
+
+[node name="SlimeB" type="Area2D" parent="." unique_id=1203053536]
+position = Vector2(130, -308)
+script = ExtResource("11_ixald")
+patrol = 70.0
+
+[node name="Shape" type="CollisionShape2D" parent="SlimeB" unique_id=1585553286]
+position = Vector2(0, 17)
+shape = SubResource("RectangleShape2D_gd2hi")
+
+[node name="BeeA" type="Area2D" parent="." unique_id=1628272009]
+position = Vector2(130, -400)
+script = ExtResource("11_ixald")
+kind = "bee"
+speed = 80.0
+patrol = 60.0
+flying = true
+body_top = -21.0
+
+[node name="Shape" type="CollisionShape2D" parent="BeeA" unique_id=543624141]
+position = Vector2(0, 1)
+shape = SubResource("RectangleShape2D_lvp54")
+
+[node name="BeeB" type="Area2D" parent="." unique_id=33607478]
+position = Vector2(1000, -700)
+script = ExtResource("11_ixald")
+kind = "bee"
+speed = 80.0
+patrol = 60.0
+flying = true
+body_top = -21.0
+
+[node name="Shape" type="CollisionShape2D" parent="BeeB" unique_id=1332789937]
+position = Vector2(0, 1)
+shape = SubResource("RectangleShape2D_oq4nq")
+
+[node name="Tunnel" type="StaticBody2D" parent="." unique_id=1338863965]
 position = Vector2(1000, 578)
 
-[node name="Shape" type="CollisionShape2D" parent="Tunnel" unique_id=805806232]
-shape = SubResource("RectangleShape2D_alef7")
+[node name="Shape" type="CollisionShape2D" parent="Tunnel" unique_id=672965261]
+shape = SubResource("RectangleShape2D_dkdvr")
 
-[node name="Look" type="TextureRect" parent="Tunnel" unique_id=2128978265]
+[node name="Look" type="TextureRect" parent="Tunnel" unique_id=91716927]
 texture_repeat = 2
 offset_left = -120.0
 offset_top = -24.0
@@ -330,39 +445,39 @@ scale = Vector2(0.5, 0.5)
 texture = ExtResource("11_555sg")
 stretch_mode = 1
 
-[node name="CoinTunnel" type="Area2D" parent="." unique_id=1361137164]
+[node name="CoinTunnel" type="Area2D" parent="." unique_id=403254749]
 position = Vector2(1000, 622)
 script = ExtResource("2_d4uo0")
 
-[node name="Shape" type="CollisionShape2D" parent="CoinTunnel" unique_id=2139615420]
-shape = SubResource("CircleShape2D_h7fxs")
+[node name="Shape" type="CollisionShape2D" parent="CoinTunnel" unique_id=309049804]
+shape = SubResource("CircleShape2D_olvhf")
 
-[node name="Look" type="Sprite2D" parent="CoinTunnel" unique_id=714088464]
+[node name="Look" type="Sprite2D" parent="CoinTunnel" unique_id=247177886]
 scale = Vector2(0.45, 0.45)
 texture = ExtResource("10_hu471")
 
-[node name="SunGoal" type="Area2D" parent="." unique_id=1649180515]
+[node name="SunGoal" type="Area2D" parent="." unique_id=440928840]
 position = Vector2(1130, -1130)
 script = ExtResource("5_s1mdx")
 
-[node name="Shape" type="CollisionShape2D" parent="SunGoal" unique_id=2097607294]
-shape = SubResource("CircleShape2D_uxobu")
+[node name="Shape" type="CollisionShape2D" parent="SunGoal" unique_id=567222421]
+shape = SubResource("CircleShape2D_w6oop")
 
-[node name="Look" type="Node2D" parent="SunGoal" unique_id=721615524]
+[node name="Look" type="Node2D" parent="SunGoal" unique_id=1168420532]
 script = ExtResource("1_q11yg")
 radius = 60.0
 
-[node name="Player" type="CharacterBody2D" parent="." unique_id=646387365]
+[node name="Player" type="CharacterBody2D" parent="." unique_id=133056116]
 position = Vector2(160, 600)
 script = ExtResource("3_xrjlp")
 
-[node name="Shape" type="CollisionShape2D" parent="Player" unique_id=568273197]
-shape = SubResource("CapsuleShape2D_m4f32")
+[node name="Shape" type="CollisionShape2D" parent="Player" unique_id=1897283015]
+shape = SubResource("CapsuleShape2D_30x5l")
 
-[node name="Look" type="AnimatedSprite2D" parent="Player" unique_id=2096246117]
+[node name="Look" type="AnimatedSprite2D" parent="Player" unique_id=1273356989]
 script = ExtResource("15_o44la")
 
-[node name="Camera" type="Camera2D" parent="Player" unique_id=456759467]
+[node name="Camera" type="Camera2D" parent="Player" unique_id=395662733]
 limit_left = 0
 limit_top = -1300
 limit_right = 1280

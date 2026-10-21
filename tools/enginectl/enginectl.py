@@ -579,6 +579,7 @@ SETUP_FILES = [  # что копируется: (откуда относител
     ("game/hud2d.gd", "game/hud2d.gd"),
     ("game/sungoal2d.gd", "game/sungoal2d.gd"),
     ("game/hero_sprite2d.gd", "game/hero_sprite2d.gd"),
+    ("game/enemy2d.gd", "game/enemy2d.gd"),
 ]
 SETUP_DIRS = ["assets/kenney/platformer"]  # папки копируются целиком (кроме *.import, их создаст Godot)
 PLUGIN_ENTRY = 'res://addons/ai_bridge/plugin.cfg'

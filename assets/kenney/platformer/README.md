@@ -11,6 +11,10 @@
   *Platformer Pack Redux* (плитки 128×128). У фона `colored_grass.png` верх сделан прозрачным
   (плавно от 300 до 560 px), чтобы холмы сливались с небом-градиентом из `game/sky2d.gd`.
 - `cloud1/2/3.png` — из *Background Elements Redux*.
+- `player_hurt.png`, `hudHeart_full.png`, `hudHeart_empty.png`, `enemies/slimeGreen*.png`, `enemies/bee*.png` — из тех же наборов
+  (человечек из *Platformer Characters 1*, сердечки и враги из *Platformer Pack Redux*, 128×128). Врагов собирает в анимацию `game/enemy2d.gd`.
+- `sounds/*.ogg` — звуки: `jump` (phaseJump1) и `coin` (pepSound1) из *Digital Audio*, `hurt` (lowDown) и `over` (lowThreeTone) оттуда же,
+  `stomp` (impactSoft_medium_000) из *Impact Sounds*, `win` (jingles_PIZZI00) из *Music Jingles*; лицензии рядом в `sounds/`. Их включает `game/hud2d.gd`.
 
 Плитки земли и кирпичи кладутся `TextureRect` с `stretch_mode` = TILE и `texture_repeat` = ENABLED,
 в описании сцены это `{"texture": "res://assets/kenney/platformer/grassMid.png", "stretch_mode": 1, "texture_repeat": 2}`.

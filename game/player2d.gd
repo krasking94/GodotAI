@@ -7,6 +7,9 @@ extends CharacterBody2D
 ## В приседе капсула 48 → 28 px (ноги остаются на месте), скорость ниже, прыгать нельзя; встать можно,
 ## только если над головой свободно (проверка формой в слое 1), иначе в журнал пишется «встать нельзя».
 ##
+## Враг (enemy2d.gd) вызывает hurt(): жизнь отнимает hud2d.gd (lose_life), персонаж возвращается на старт
+## и 2 секунды мигает (неуязвим); если жизни кончились, персонаж замирает (is_hurt), дальше R или Enter.
+##
 ## Самопроверка для ИИ: --test-player2d=jumpright:1.1,jumpright:1.1,crawl:2,stand:0.5
 ## (фазы right, left, jump, jumpright, jumpleft, crouch, crawl, stand, wait; секунды после двоеточия).
 ## Прыжок в фазе «ждёт пола»: если в момент начала фазы персонаж ещё в воздухе, он прыгнет, как только
@@ -18,10 +21,16 @@ const JUMP_SPEED := -650.0  # высота прыжка ≈ 215 px при ста
 const STAND_HEIGHT := 48.0
 const CROUCH_HEIGHT := 28.0
 const FALL_LIMIT_Y := 2000.0  # ниже этой точки персонаж упал с уровня и возвращается на старт
+const INVULNERABLE_TIME := 2.0
 
 @export var test_program := ""
 
 var is_crouched := false
+var is_hurt := false
+
+var _dead := false
+var _invulnerable := 0.0
+var _hud: Node = null
 
 var _gravity: float = ProjectSettings.get_setting("physics/2d/default_gravity", 980.0)
 var _phases: Array = []
@@ -59,6 +68,7 @@ func _ready() -> void:
 			_phases.append({"name": pair[0].strip_edges(), "seconds": float(pair[1])})
 	_phase_start = global_position
 	_phase_top_y = global_position.y
+	_hud = get_tree().root.find_child("Hud", true, false)
 	if not _phases.is_empty():
 		_jump_pending = _phases[0]["name"].begins_with("jump")
 	print("Персонаж 2D готов: позиция %s" % global_position.round())
@@ -101,6 +111,16 @@ func _physics_process(delta: float) -> void:
 		direction = Input.get_axis("ui_left", "ui_right")
 		jump = Input.is_action_just_pressed("ui_up") or Input.is_action_just_pressed("ui_accept")
 		wants_crouch = Input.is_action_pressed("ui_down")
+	if _dead:  # жизни кончились: стоим, ждём перезапуска
+		direction = 0.0
+		jump = false
+		wants_crouch = false
+	if _invulnerable > 0.0:
+		_invulnerable -= delta
+		is_hurt = _invulnerable > INVULNERABLE_TIME - 0.6
+		var look := get_node_or_null("Look")
+		if look != null:
+			look.modulate.a = 1.0 if _invulnerable <= 0.0 or fmod(_invulnerable, 0.2) < 0.1 else 0.4
 
 	_update_crouch(wants_crouch)
 	if not is_on_floor():
@@ -108,6 +128,8 @@ func _physics_process(delta: float) -> void:
 	elif jump and not is_crouched:
 		velocity.y = JUMP_SPEED
 		_jump_pending = false
+		if _hud != null and _hud.has_method("play_sound"):
+			_hud.play_sound("jump")
 	velocity.x = direction * (CROUCH_SPEED if is_crouched else SPEED)
 	move_and_slide()
 	if global_position.y > FALL_LIMIT_Y:
@@ -152,3 +174,25 @@ func _headroom_free() -> bool:
 	query.exclude = [get_rid()]
 	query.collision_mask = 1
 	return get_world_2d().direct_space_state.intersect_shape(query, 1).is_empty()
+
+
+## Ранение от врага: жизнь отнимает Hud; возвращаемся на старт и две секунды мигаем.
+func hurt() -> void:
+	if _dead or _invulnerable > 0.0:
+		return
+	var dead := false
+	if _hud != null and _hud.has_method("lose_life"):
+		dead = _hud.lose_life()
+	if dead:
+		_dead = true
+		is_hurt = true
+		velocity.x = 0.0
+		print("Персонаж 2D: жизни кончились")
+		return
+	print("Персонаж 2D ранен, возвращаюсь на старт")
+	_invulnerable = INVULNERABLE_TIME
+	is_hurt = true
+	if is_crouched:
+		_set_crouched(false)
+	global_position = _start_position
+	velocity = Vector2.ZERO
