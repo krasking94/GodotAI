@@ -1,0 +1,55 @@
+{
+  "phrase": "Сделай 3D-игру «Кладбище»: ночь, туман, кладбище из моделей Kenney, герой со сменными скинами сам стреляет в орду зомби, скелетов и призраков, души дают уровни и прокачку, в конце выходит вампир; продержись три минуты.",
+  "scene": {
+    "path": "res://scenes/graveyard.tscn",
+    "root_type": "Node3D",
+    "root_name": "Graveyard"
+  },
+  "ops": [
+    {
+      "op": "set",
+      "path": ".",
+      "props": {
+        "script": "res://game/gy_game.gd",
+        "round_seconds": 180.0
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Player",
+      "type": "CharacterBody3D",
+      "props": {
+        "position": [
+          0,
+          0.95,
+          0
+        ],
+        "script": "res://game/gy_hero.gd"
+      }
+    },
+    {
+      "op": "create",
+      "parent": "Player",
+      "name": "Shape",
+      "type": "CollisionShape3D",
+      "props": {
+        "shape": {
+          "primitive": "capsule",
+          "radius": 0.4,
+          "height": 1.8
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "Hud",
+      "type": "CanvasLayer",
+      "props": {
+        "layer": 10,
+        "script": "res://game/gy_hud.gd"
+      }
+    }
+  ]
+}

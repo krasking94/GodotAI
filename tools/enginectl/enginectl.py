@@ -580,8 +580,15 @@ SETUP_FILES = [  # что копируется: (откуда относител
     ("game/sungoal2d.gd", "game/sungoal2d.gd"),
     ("game/hero_sprite2d.gd", "game/hero_sprite2d.gd"),
     ("game/enemy2d.gd", "game/enemy2d.gd"),
+    ("game/grid.gdshader", "game/grid.gdshader"),
+    ("game/gy_game.gd", "game/gy_game.gd"),
+    ("game/gy_hero.gd", "game/gy_hero.gd"),
+    ("game/gy_enemy.gd", "game/gy_enemy.gd"),
+    ("game/gy_bolt.gd", "game/gy_bolt.gd"),
+    ("game/gy_hud.gd", "game/gy_hud.gd"),
+    ("tools/enginectl/examples/graveyard.json", "tools/enginectl/examples/graveyard.json"),
 ]
-SETUP_DIRS = ["assets/kenney/platformer"]  # папки копируются целиком (кроме *.import, их создаст Godot)
+SETUP_DIRS = ["assets/kenney/platformer", "assets/kenney/graveyard", "assets/kenney/characters"]  # папки копируются целиком (кроме *.import, их создаст Godot)
 PLUGIN_ENTRY = 'res://addons/ai_bridge/plugin.cfg'
 MIN_GITIGNORE = "# Служебные папки Godot\n.godot/\n.import/\nexport_presets.cfg\n\n# Сборки\nbuild/\n*.apk\n*.exe\n*.pck\n\n# Секреты\n.env\n*.keystore\n"
 
