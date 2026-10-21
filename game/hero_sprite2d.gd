@@ -2,7 +2,7 @@ extends AnimatedSprite2D
 
 ## Человечек из картинок Kenney (CC0) для 2D-примера: кадры stand / walk / jump / duck / cheer собираются
 ## в анимации кодом, без отдельного файла SpriteFrames. Смотрит в сторону движения, при ходьбе шагает,
-## в прыжке и падении поза jump, в приседе duck; после победы cheer (вызывает sungoal2d.gd через cheer()).
+## в прыжке и падении поза jump, в приседе duck, после ранения hurt; после победы cheer (вызывает sungoal2d.gd через cheer()).
 ## Ноги стоят на низу капсулы персонажа (24 px). Другой персонаж: поменяйте PREFIX, например "adventurer".
 
 const DIR := "res://assets/kenney/platformer/"
@@ -22,6 +22,7 @@ func _ready() -> void:
 	_add(frames, "jump", ["jump"], 5.0)
 	_add(frames, "duck", ["duck"], 5.0)
 	_add(frames, "cheer", ["cheer1", "stand"], 4.0)
+	_add(frames, "hurt", ["hurt"], 5.0)
 	sprite_frames = frames
 	scale = Vector2(SPRITE_SCALE, SPRITE_SCALE)
 	var tex: Texture2D = frames.get_frame_texture("stand", 0)
@@ -52,6 +53,8 @@ func _process(_delta: float) -> void:
 	var anim := "stand"
 	if _cheering:
 		anim = "cheer"
+	elif body.get("is_hurt") == true:
+		anim = "hurt"
 	elif body.get("is_crouched") == true:
 		anim = "duck"
 	elif not body.is_on_floor():

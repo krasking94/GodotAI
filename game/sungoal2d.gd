@@ -19,5 +19,7 @@ func _on_body_entered(body: Node2D) -> void:
 	if look != null and look.has_method("cheer"):
 		look.cheer()
 	var hud := get_tree().root.find_child("Hud", true, false)  # ищем от корня: при запуске для снимка current_scene не задана
-	if hud != null and hud.has_method("show_message"):
+	if hud != null and hud.has_method("win"):
+		hud.win()
+	elif hud != null and hud.has_method("show_message"):
 		hud.show_message("Ты добрался до солнца!")

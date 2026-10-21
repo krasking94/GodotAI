@@ -63,7 +63,8 @@
       "type": "CanvasLayer",
       "props": {
         "layer": 10,
-        "script": "res://game/hud2d.gd"
+        "script": "res://game/hud2d.gd",
+        "max_lives": 3
       }
     },
     {
@@ -827,6 +828,318 @@
           0,
           42
         ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "CloudSideA",
+      "type": "StaticBody2D",
+      "props": {
+        "position": [
+          130,
+          380
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "CloudSideA",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "shape": {
+          "primitive": "rectangle",
+          "size": [
+            200,
+            32
+          ]
+        },
+        "one_way_collision": true
+      }
+    },
+    {
+      "op": "create",
+      "parent": "CloudSideA",
+      "name": "Look",
+      "type": "Sprite2D",
+      "props": {
+        "texture": "res://assets/kenney/platformer/cloud3.png",
+        "scale": [
+          0.9259259259259259,
+          0.9259259259259259
+        ],
+        "position": [
+          0,
+          42
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "CoinSideA",
+      "type": "Area2D",
+      "props": {
+        "position": [
+          130,
+          328
+        ],
+        "script": "res://game/coin2d.gd"
+      }
+    },
+    {
+      "op": "create",
+      "parent": "CoinSideA",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "shape": {
+          "primitive": "circle",
+          "radius": 14
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": "CoinSideA",
+      "name": "Look",
+      "type": "Sprite2D",
+      "props": {
+        "texture": "res://assets/kenney/platformer/coinGold.png",
+        "scale": [
+          0.45,
+          0.45
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "SlimeA",
+      "type": "Area2D",
+      "props": {
+        "position": [
+          85,
+          332
+        ],
+        "script": "res://game/enemy2d.gd",
+        "kind": "slimeGreen",
+        "speed": 60.0,
+        "patrol": 45.0,
+        "body_top": 1.0
+      }
+    },
+    {
+      "op": "create",
+      "parent": "SlimeA",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "position": [
+          0,
+          17
+        ],
+        "shape": {
+          "primitive": "rectangle",
+          "size": [
+            40,
+            28
+          ]
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "CloudSideB",
+      "type": "StaticBody2D",
+      "props": {
+        "position": [
+          130,
+          -260
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": "CloudSideB",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "shape": {
+          "primitive": "rectangle",
+          "size": [
+            200,
+            32
+          ]
+        },
+        "one_way_collision": true
+      }
+    },
+    {
+      "op": "create",
+      "parent": "CloudSideB",
+      "name": "Look",
+      "type": "Sprite2D",
+      "props": {
+        "texture": "res://assets/kenney/platformer/cloud1.png",
+        "scale": [
+          0.9852216748768473,
+          0.9852216748768473
+        ],
+        "position": [
+          0,
+          42
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "CoinSideB",
+      "type": "Area2D",
+      "props": {
+        "position": [
+          130,
+          -312
+        ],
+        "script": "res://game/coin2d.gd"
+      }
+    },
+    {
+      "op": "create",
+      "parent": "CoinSideB",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "shape": {
+          "primitive": "circle",
+          "radius": 14
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": "CoinSideB",
+      "name": "Look",
+      "type": "Sprite2D",
+      "props": {
+        "texture": "res://assets/kenney/platformer/coinGold.png",
+        "scale": [
+          0.45,
+          0.45
+        ]
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "SlimeB",
+      "type": "Area2D",
+      "props": {
+        "position": [
+          130,
+          -308
+        ],
+        "script": "res://game/enemy2d.gd",
+        "kind": "slimeGreen",
+        "speed": 60.0,
+        "patrol": 70.0,
+        "body_top": 1.0
+      }
+    },
+    {
+      "op": "create",
+      "parent": "SlimeB",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "position": [
+          0,
+          17
+        ],
+        "shape": {
+          "primitive": "rectangle",
+          "size": [
+            40,
+            28
+          ]
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "BeeA",
+      "type": "Area2D",
+      "props": {
+        "position": [
+          130,
+          -400
+        ],
+        "script": "res://game/enemy2d.gd",
+        "kind": "bee",
+        "speed": 80.0,
+        "patrol": 60.0,
+        "flying": true,
+        "body_top": -21.0
+      }
+    },
+    {
+      "op": "create",
+      "parent": "BeeA",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "position": [
+          0,
+          1
+        ],
+        "shape": {
+          "primitive": "rectangle",
+          "size": [
+            36,
+            36
+          ]
+        }
+      }
+    },
+    {
+      "op": "create",
+      "parent": ".",
+      "name": "BeeB",
+      "type": "Area2D",
+      "props": {
+        "position": [
+          1000,
+          -700
+        ],
+        "script": "res://game/enemy2d.gd",
+        "kind": "bee",
+        "speed": 80.0,
+        "patrol": 60.0,
+        "flying": true,
+        "body_top": -21.0
+      }
+    },
+    {
+      "op": "create",
+      "parent": "BeeB",
+      "name": "Shape",
+      "type": "CollisionShape2D",
+      "props": {
+        "position": [
+          0,
+          1
+        ],
+        "shape": {
+          "primitive": "rectangle",
+          "size": [
+            36,
+            36
+          ]
+        }
       }
     },
     {

@@ -40,4 +40,7 @@ func _on_body_entered(body: Node2D) -> void:
 	if body is CharacterBody2D:
 		collected += 1
 		print("Монетка собрана! Всего: %d из %d" % [collected, total])
+		var hud := get_tree().root.find_child("Hud", true, false)
+		if hud != null and hud.has_method("add_coin"):
+			hud.add_coin()
 		queue_free()
