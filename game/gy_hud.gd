@@ -1,7 +1,8 @@
 extends CanvasLayer
 
 ## Табло «Кладбища»: полоса здоровья, таймер, уровень, убитые, рекорд, полоса опыта внизу, красная вспышка
-## при ударе, большие надписи (победа, поражение), окно прокачки (1, 2, 3 или кнопки) и стартовое меню
+## при ударе, большие надписи (победа, поражение), окно прокачки (три карточки с рисованными значками и пометкой
+## «Рекомендуется»: клавиши 1 2 3, стрелки и Enter или мышь) и стартовое меню
 ## (← → скин, Enter — начать). Работает и на паузе (process_mode ALWAYS): окно прокачки показывается,
 ## когда игра стоит. Все клавиши меню, прокачки и R обрабатываются здесь и передаются в gy_game.gd.
 
@@ -20,7 +21,9 @@ var _banner_timer := 0.0
 var _flash_rect: ColorRect
 var _levelup_panel: PanelContainer
 var _levelup_title: Label
-var _levelup_buttons: Array = []
+var _levelup_cards: Array = []  # [PanelContainer, UpgradeIcon, Label заголовок, Label описание, Label «Рекомендуется»]
+var _levelup_focus := 0
+var _levelup_count := 3
 var _menu_panel: PanelContainer
 var _menu_skin: Label
 var _menu_best: Label
@@ -133,22 +136,130 @@ func _panel() -> PanelContainer:
 	return panel
 
 
+const UPGRADE_COLORS := {"damage": "#ff6b4a", "rate": "#ffd24a", "multishot": "#ffa84a", "speed": "#4ad0ff",
+	"health": "#ff4a6e", "magnet": "#c07aff", "pierce": "#9fe34a", "regen": "#4aff9a"}
+
+
+## Значок прокачки, нарисованный кодом (меч, молния, сердце и т. д.), чтобы не тащить картинки.
+class UpgradeIcon extends Control:
+	var kind := ""
+	var color := Color.WHITE
+
+	func _draw() -> void:
+		var c := size * 0.5
+		var r := minf(size.x, size.y) * 0.5
+		draw_circle(c, r, Color(color, 0.16))
+		draw_arc(c, r - 1.5, 0.0, TAU, 48, color, 2.5, true)
+		var one := PackedColorArray([color])
+		match kind:
+			"damage":
+				draw_line(c + Vector2(-r * 0.4, r * 0.4), c + Vector2(r * 0.45, -r * 0.45), color, 6.0, true)
+				draw_line(c + Vector2(-r * 0.5, r * 0.1), c + Vector2(-r * 0.1, r * 0.5), color, 5.0, true)
+				draw_line(c + Vector2(-r * 0.4, r * 0.4), c + Vector2(-r * 0.62, r * 0.62), color, 8.0, true)
+			"rate":
+				draw_polyline(PackedVector2Array([c + Vector2(r * 0.15, -r * 0.62), c + Vector2(-r * 0.3, r * 0.05),
+					c + Vector2(r * 0.08, r * 0.05), c + Vector2(-r * 0.15, r * 0.62)]), color, 5.0, true)
+			"multishot":
+				for i in 3:
+					draw_circle(c + Vector2((i - 1) * r * 0.42, -absf(i - 1) * r * 0.18 + r * 0.05), r * 0.17, color)
+			"speed":
+				for i in 3:
+					draw_line(c + Vector2(-r * 0.6, (i - 1) * r * 0.3), c + Vector2(r * (0.1 if i != 1 else 0.35), (i - 1) * r * 0.3), color, 5.0, true)
+				draw_polygon(PackedVector2Array([c + Vector2(r * 0.35, -r * 0.28), c + Vector2(r * 0.7, 0.0), c + Vector2(r * 0.35, r * 0.28)]), one)
+			"health":
+				draw_circle(c + Vector2(-r * 0.26, -r * 0.18), r * 0.3, color)
+				draw_circle(c + Vector2(r * 0.26, -r * 0.18), r * 0.3, color)
+				draw_polygon(PackedVector2Array([c + Vector2(-r * 0.54, -r * 0.05), c + Vector2(r * 0.54, -r * 0.05), c + Vector2(0.0, r * 0.58)]), one)
+			"magnet":
+				draw_arc(c + Vector2(0.0, -r * 0.05), r * 0.4, PI, TAU, 24, color, 8.0, true)
+				draw_line(c + Vector2(-r * 0.4, -r * 0.05), c + Vector2(-r * 0.4, r * 0.45), color, 8.0, true)
+				draw_line(c + Vector2(r * 0.4, -r * 0.05), c + Vector2(r * 0.4, r * 0.45), color, 8.0, true)
+			"pierce":
+				draw_arc(c, r * 0.3, 0.0, TAU, 24, color, 3.0, true)
+				draw_line(c + Vector2(-r * 0.68, 0.0), c + Vector2(r * 0.5, 0.0), color, 4.0, true)
+				draw_polygon(PackedVector2Array([c + Vector2(r * 0.45, -r * 0.2), c + Vector2(r * 0.72, 0.0), c + Vector2(r * 0.45, r * 0.2)]), one)
+			"regen":
+				draw_rect(Rect2(c + Vector2(-r * 0.13, -r * 0.52), Vector2(r * 0.26, r * 1.04)), color)
+				draw_rect(Rect2(c + Vector2(-r * 0.52, -r * 0.13), Vector2(r * 1.04, r * 0.26)), color)
+			_:
+				draw_circle(c, r * 0.3, color)
+
+
+func _card_style(color: Color, focused: bool) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.10, 0.11, 0.17, 0.98) if focused else Color(0.06, 0.07, 0.11, 0.96)
+	box.border_color = color if focused else Color(color, 0.45)
+	box.set_border_width_all(4 if focused else 2)
+	box.set_corner_radius_all(12)
+	box.set_content_margin_all(14)
+	return box
+
+
 func _build_levelup() -> void:
 	_levelup_panel = _panel()
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 12)
+	column.add_theme_constant_override("separation", 14)
 	_levelup_title = _make_label(30)
 	_levelup_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_levelup_title)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
 	for i in 3:
-		var button := Button.new()
-		button.add_theme_font_size_override("font_size", 22)
-		button.custom_minimum_size = Vector2(420, 64)
-		button.pressed.connect(func(): if game != null: game.choose_upgrade(i))
-		column.add_child(button)
-		_levelup_buttons.append(button)
+		var card := PanelContainer.new()
+		card.custom_minimum_size = Vector2(236, 300)
+		card.mouse_filter = Control.MOUSE_FILTER_STOP
+		card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		card.gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and game != null:
+				game.choose_upgrade(i))
+		card.mouse_entered.connect(func(): _set_levelup_focus(i))
+		var inner := VBoxContainer.new()
+		inner.add_theme_constant_override("separation", 8)
+		var key := _make_label(18)
+		key.text = "%d" % (i + 1)
+		key.modulate = Color(1, 1, 1, 0.6)
+		inner.add_child(key)
+		var icon := UpgradeIcon.new()
+		icon.custom_minimum_size = Vector2(84, 84)
+		icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		inner.add_child(icon)
+		var title := _make_label(24)
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		inner.add_child(title)
+		var text := _make_label(17)
+		text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		text.modulate = Color(1, 1, 1, 0.85)
+		text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		inner.add_child(text)
+		var badge := _make_label(16)
+		badge.text = "★ Рекомендуется"
+		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		badge.add_theme_color_override("font_color", Color("#ffd24a"))
+		inner.add_child(badge)
+		card.add_child(inner)
+		row.add_child(card)
+		_levelup_cards.append([card, icon, title, text, badge])
+	column.add_child(row)
+	var hint := _make_label(16)
+	hint.text = "1 2 3, стрелки и Enter или щелчок мышью"
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.modulate = Color(1, 1, 1, 0.6)
+	column.add_child(hint)
 	_levelup_panel.add_child(column)
 	add_child(_levelup_panel)
+
+
+func _set_levelup_focus(index: int) -> void:
+	if _levelup_count <= 0:
+		return
+	_levelup_focus = wrapi(index, 0, _levelup_count)
+	for i in _levelup_cards.size():
+		var card: PanelContainer = _levelup_cards[i][0]
+		var icon: UpgradeIcon = _levelup_cards[i][1]
+		card.add_theme_stylebox_override("panel", _card_style(icon.color, i == _levelup_focus))
 
 
 func _build_menu() -> void:
@@ -189,11 +300,11 @@ func _process(delta: float) -> void:
 			_banner.visible = false
 	if _flash_rect.color.a > 0.0:
 		_flash_rect.color.a = maxf(_flash_rect.color.a - delta * 2.5, 0.0)
-	if game != null and str(game.get("state")) == "levelup" and bool(game.get("auto")):
+	if game != null and str(game.get("state")) == "levelup" and bool(game.get("auto")) and not bool(game.get("hold_levelup")):
 		_auto_timer += delta
 		if _auto_timer >= 0.3:
 			_auto_timer = 0.0
-			game.choose_upgrade(randi_range(0, 2))
+			game.choose_upgrade(int(game.get("recommended_index")))
 
 
 func _input(event: InputEvent) -> void:
@@ -209,6 +320,12 @@ func _input(event: InputEvent) -> void:
 				game.choose_upgrade(1)
 			elif key == KEY_3 or key == KEY_KP_3:
 				game.choose_upgrade(2)
+			elif key == KEY_LEFT or key == KEY_A:
+				_set_levelup_focus(_levelup_focus - 1)
+			elif key == KEY_RIGHT or key == KEY_D:
+				_set_levelup_focus(_levelup_focus + 1)
+			elif key == KEY_ENTER or key == KEY_KP_ENTER or key == KEY_SPACE:
+				game.choose_upgrade(_levelup_focus)
 		"menu":
 			if key == KEY_LEFT or key == KEY_A:
 				game.menu_skin(-1)
@@ -247,16 +364,24 @@ func show_message(text: String) -> void:
 	print("Надпись на экране: %s" % text.replace("\n", " "))
 
 
-func show_levelup(options: Array, level: int) -> void:
+func show_levelup(options: Array, level: int, recommended: int = 0) -> void:
 	_levelup_title.text = "Уровень %d! Выбери прокачку" % level
-	for i in _levelup_buttons.size():
-		var button: Button = _levelup_buttons[i]
+	_levelup_count = mini(options.size(), _levelup_cards.size())
+	for i in _levelup_cards.size():
+		var card: PanelContainer = _levelup_cards[i][0]
 		if i < options.size():
 			var option: Dictionary = options[i]
-			button.text = "%d. %s — %s" % [i + 1, str(option["title"]), str(option["text"])]
-			button.visible = true
+			var icon: UpgradeIcon = _levelup_cards[i][1]
+			icon.kind = str(option["id"])
+			icon.color = Color(UPGRADE_COLORS.get(icon.kind, "#ffffff"))
+			icon.queue_redraw()
+			_levelup_cards[i][2].text = str(option["title"])
+			_levelup_cards[i][3].text = str(option["text"])
+			_levelup_cards[i][4].visible = (i == recommended)
+			card.visible = true
 		else:
-			button.visible = false
+			card.visible = false
+	_set_levelup_focus(recommended)
 	_auto_timer = 0.0
 	_levelup_panel.visible = true
 
