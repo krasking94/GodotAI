@@ -29,6 +29,8 @@ var bolt_speed := 15.0
 var shield := 0.0  # щит от укреплений форпоста: принимает урон первым
 var autopilot := ""
 var alive := true
+var _dash_timer := 0.0
+var _dash_dir := Vector3.ZERO
 
 var _model: Node3D
 var _limbs := {}
@@ -127,7 +129,15 @@ func _physics_process(delta: float) -> void:
 		hazard = world.hazard_at(global_position)
 		factor = world.speed_factor(global_position, "hero")
 	var wanted := Vector3(dir.x * speed * factor, 0, dir.z * speed * factor)
-	if hazard == "ice":
+	if _dash_timer > 0.0:
+		# Рывок: быстро вперёд сквозь врагов (столкновения с ними выключены), следом искры.
+		_dash_timer -= delta
+		wanted = _dash_dir * 32.0
+		if game.has_method("spawn_burst") and fmod(_dash_timer, 0.05) < delta:
+			game.spawn_burst(global_position + Vector3(0, 0.6, 0), Color("#8ad8ff"), 0.5)
+		if _dash_timer <= 0.0:
+			collision_mask = 1 | 4
+	if hazard == "ice" and _dash_timer <= 0.0:
 		# Лёд: скорость догоняет желаемую медленно, поэтому герой скользит.
 		var k := 1.0 - exp(-2.2 * delta)
 		velocity.x = lerpf(velocity.x, wanted.x, k)
@@ -272,6 +282,17 @@ func take_damage(amount: float) -> void:
 
 func heal(amount: float) -> void:
 	hp = minf(hp + amount, max_hp)
+
+
+## Призрачный рывок на distance метров в сторону движения (или взгляда): 0,6 с неуязвимости, сквозь врагов.
+func dash(distance: float) -> void:
+	var dir := _input_direction()
+	if dir.length() < 0.1:
+		dir = Vector3(sin(_facing), 0, cos(_facing))
+	_dash_dir = dir.normalized()
+	_dash_timer = distance / 32.0
+	_hurt_timer = maxf(_hurt_timer, 0.6)
+	collision_mask = 1  # сквозь врагов (слой 4), стены остаются
 
 
 func _animate(move: float, delta: float) -> void:

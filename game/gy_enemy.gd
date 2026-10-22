@@ -27,7 +27,11 @@ var guard_target: Node3D = null
 var title := ""
 var immune: Array = []  # лужи, которые не замедляют (ice, mud)
 var base_target := Vector3.INF  # нападающий на форпост: идёт не к герою, а к этой точке у забора и бьёт забор
+var frozen := 0.0  # секунды во льду (Ледяной взрыв): стоит, не бьёт
 var game: Node = null
+
+static var _ice_mesh: BoxMesh
+static var _ice_material: StandardMaterial3D
 
 static var _tinted := {}  # кэш подкрашенных материалов: ключ «вид:материал»
 static var _skins := {}  # кэш материалов человечков: ключ «скин:подкраска»
@@ -47,6 +51,8 @@ var _orbit := 0.0
 var _model_scale := 1.0
 var _skin := ""
 var _slowed := 0.0
+var _knock := Vector3.ZERO  # отбрасывание (Святая волна, Метеор), гаснет за полсекунды
+var _ice: MeshInstance3D = null
 
 
 func setup(enemy_kind: String, stats: Dictionary, owner_game: Node) -> void:
@@ -195,12 +201,30 @@ func _physics_process(delta: float) -> void:
 	var world: Node = game.get("world")
 	if world != null:
 		factor = world.speed_factor(global_position, "enemy", immune)
+	var abilities: Node = game.get("abilities")
+	if abilities != null:
+		factor *= float(abilities.enemy_slow)
 	_slowed = lerpf(_slowed, 1.0 - factor, 1.0 - exp(-6.0 * delta))
 	velocity.x = dir.x * speed * factor
 	velocity.z = dir.z * speed * factor
 	if _windup > 0.0 or _lunge > 0.0:
 		velocity.x = 0.0  # во время замаха и выпада стоит на месте
 		velocity.z = 0.0
+	if frozen > 0.0:
+		frozen -= delta
+		velocity.x = 0.0
+		velocity.z = 0.0
+		_windup = 0.0
+		_lunge = 0.0
+		if frozen <= 0.0 and _ice != null:
+			_ice.queue_free()
+			_ice = null
+	if _knock != Vector3.ZERO:
+		velocity.x += _knock.x
+		velocity.z += _knock.z
+		_knock = _knock.lerp(Vector3.ZERO, 1.0 - exp(-7.0 * delta))
+		if _knock.length() < 0.2:
+			_knock = Vector3.ZERO
 	if is_ghost:
 		velocity.y = 0.0
 		global_position.y = 0.3 + sin(_anim * 2.0) * 0.15
@@ -219,7 +243,7 @@ func _physics_process(delta: float) -> void:
 			_lunge = 0.3
 			if dist < reach * 1.25:
 				_strike(player)
-	elif chasing and dist < reach and _attack_cooldown <= 0.0:
+	elif chasing and dist < reach and _attack_cooldown <= 0.0 and frozen <= 0.0:
 		_attack_cooldown = 1.2
 		_windup = 0.28
 		game.play_sound("windup")
@@ -274,3 +298,34 @@ func take_damage(amount: float) -> void:
 	if hp <= 0.0:
 		game.on_enemy_died(self)
 		queue_free()
+
+
+## Отбросить: толчок в метрах в секунду, гаснет сам. Боссов отбрасывает втрое слабее.
+func knockback(push: Vector3) -> void:
+	_knock += push * (0.3 if is_boss else 1.0)
+
+
+## Вморозить в лёд на seconds: стоит на месте, не бьёт, вокруг полупрозрачный ледяной куб.
+func freeze(seconds: float) -> void:
+	if is_boss:
+		seconds *= 0.4
+	frozen = maxf(frozen, seconds)
+	if _ice != null:
+		return
+	if _ice_mesh == null:
+		_ice_mesh = BoxMesh.new()
+		_ice_mesh.size = Vector3.ONE
+		_ice_material = StandardMaterial3D.new()
+		_ice_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_ice_material.albedo_color = Color(0.6, 0.85, 1.0, 0.45)
+		_ice_material.roughness = 0.1
+		_ice_material.emission_enabled = true
+		_ice_material.emission = Color(0.3, 0.6, 1.0)
+		_ice_material.emission_energy_multiplier = 0.4
+	_ice = MeshInstance3D.new()
+	_ice.mesh = _ice_mesh
+	_ice.material_override = _ice_material
+	_ice.scale = Vector3(0.6 * _size, 0.8 * _size, 0.6 * _size)
+	_ice.position = Vector3(0, 0.4 * _size, 0)
+	_ice.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_ice)
