@@ -187,6 +187,7 @@ func _shoot(moving: bool) -> void:
 		var spread := 0.0 if projectiles == 1 else deg_to_rad(-9.0 * (projectiles - 1) * 0.5 + 9.0 * i)
 		var bolt := Bolt.new()
 		bolt.setup(base.rotated(Vector3.UP, spread), bolt_speed, damage, pierce)
+		bolt.game = game
 		bolts_root.add_child(bolt)
 		bolt.global_position = global_position + Vector3(0, 0.1, 0) + base * 0.7
 	game.play_sound("bolt")
