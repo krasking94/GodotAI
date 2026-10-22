@@ -26,6 +26,7 @@ var pierce := 1
 var magnet := 3.0
 var regen := 0.0
 var bolt_speed := 15.0
+var shield := 0.0  # щит от укреплений форпоста: принимает урон первым
 var autopilot := ""
 var alive := true
 
@@ -113,7 +114,9 @@ func _physics_process(delta: float) -> void:
 	if _lantern != null and _lantern.visible:
 		_lantern_phase += delta
 		_lantern.light_energy = 1.6 + 0.15 * sin(_lantern_phase * 9.0) + 0.1 * sin(_lantern_phase * 23.0)
-	if game == null or str(game.get("state")) != "playing" or not alive:
+	var state := str(game.get("state")) if game != null else ""
+	var in_base := state == "base"
+	if game == null or not (state == "playing" or in_base) or not alive:
 		_animate(0.0, delta)
 		return
 	var dir := _input_direction()
@@ -157,7 +160,7 @@ func _physics_process(delta: float) -> void:
 	_fire_timer -= delta
 	if _fire_timer <= 0.0:
 		_fire_timer = fire_interval
-		_shoot(dir.length() > 0.1)
+		_shoot(dir.length() > 0.1, 9.0 if in_base else SHOOT_RANGE)
 
 
 func _input_direction() -> Vector3:
@@ -223,13 +226,13 @@ func _nearest_enemy() -> Node3D:
 	return best
 
 
-func _shoot(moving: bool) -> void:
+func _shoot(moving: bool, shoot_range: float) -> void:
 	var target := _nearest_enemy()
 	if target == null:
 		return
 	var to := target.global_position - global_position
 	to.y = 0
-	if to.length() > SHOOT_RANGE or to.length() < 0.01:
+	if to.length() > shoot_range or to.length() < 0.01:
 		return
 	var base := to.normalized()
 	if not moving:
@@ -248,11 +251,17 @@ func _shoot(moving: bool) -> void:
 func take_damage(amount: float) -> void:
 	if not alive or _hurt_timer > 0.0:
 		return
+	if shield > 0.0:
+		var absorbed := minf(shield, amount)
+		shield -= absorbed
+		amount -= absorbed
+		if absorbed > 0.0:
+			game.spawn_burst(global_position + Vector3(0, 1.0, 0), Color("#6ad0ff"), 0.8)
 	hp -= amount
 	_hurt_timer = 0.4
 	_flash = 0.15
 	game.play_sound("hurt")
-	if game.hud != null:
+	if game.hud != null and amount > 0.0:
 		game.hud.flash()
 	if hp <= 0.0:
 		hp = 0.0

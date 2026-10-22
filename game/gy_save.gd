@@ -18,6 +18,7 @@ const DEFAULT := {
 	"slots": [],  # id способностей в четырёх слотах
 	"fence": 0,
 	"unlocked": ["old"],  # id открытых карт
+	"stats": {"nights": 0, "wins": 0, "kills": 0, "souls_total": 0},  # летопись
 }
 
 static var data: Dictionary = {}
@@ -70,6 +71,67 @@ static func set_record(map_id: String, score: int, won: bool) -> bool:
 
 static func is_won(map_id: String) -> bool:
 	return bool(load_data()["won"].get(map_id, false))
+
+
+static func souls() -> int:
+	return int(load_data()["souls"])
+
+
+static func add_souls(amount: int) -> void:
+	load_data()
+	data["souls"] = int(data["souls"]) + amount
+	if amount > 0:
+		data["stats"]["souls_total"] = int(data["stats"].get("souls_total", 0)) + amount
+	store()
+
+
+## Списать души, если хватает; возвращает true при успехе.
+static func spend(amount: int) -> bool:
+	load_data()
+	if int(data["souls"]) < amount:
+		return false
+	data["souls"] = int(data["souls"]) - amount
+	store()
+	return true
+
+
+static func upgrade_level(id: String) -> int:
+	return int(load_data()["upgrades"].get(id, 0))
+
+
+static func set_upgrade_level(id: String, level: int) -> void:
+	load_data()["upgrades"][id] = level
+	store()
+
+
+static func fence_level() -> int:
+	return int(load_data()["fence"])
+
+
+static func set_fence_level(level: int) -> void:
+	load_data()["fence"] = level
+	store()
+
+
+static func is_unlocked(map_id: String) -> bool:
+	return load_data()["unlocked"].has(map_id)
+
+
+static func unlock(map_id: String) -> void:
+	load_data()
+	if not data["unlocked"].has(map_id):
+		data["unlocked"].append(map_id)
+	store()
+
+
+static func add_stat(key: String, amount: int) -> void:
+	load_data()
+	data["stats"][key] = int(data["stats"].get(key, 0)) + amount
+	store()
+
+
+static func stat(key: String) -> int:
+	return int(load_data()["stats"].get(key, 0))
 
 
 static func skin() -> String:

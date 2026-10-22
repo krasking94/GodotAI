@@ -5,18 +5,23 @@ extends Node3D
 ## мир по описанию карты строит gy_world.gd. Из тумана идут зомби, скелеты и призраки, на 80 % раунда
 ## выходит босс. Герой стреляет сам в ближайшего врага, игрок только бегает (стрелки или WASD) и на каждом
 ## новом уровне выбирает прокачку (1, 2, 3). Души убитых дают опыт, тыквы лечат. Продержался round_seconds — победа.
-## Перед игрой меню: ← → выбирают карту, ↑ ↓ — скин героя (8 скинов Kenney), Enter начинает;
-## после конца R — та же карта заново, Enter — в меню. Рекорды по картам хранит gy_save.gd.
-## Этот узел — корень сцены и ведущий раунда; Player (gy_hero.gd) и Hud (gy_hud.gd) — его дети из сцены,
+## Между ночами — форпост (gy_base.gd): по нему ходишь, у зданий нажимаешь E: Алтарь душ (постоянная
+## прокачка за души), Костёр (смена героя), Дом сторожа (летопись), Башня (укрепления: щит в начале ночи),
+## Ворота (выбор карты: открываются за души). Души — валюта, их приносит каждая ночь (убитые, уровни, победа).
+## После конца ночи R — та же карта заново, Enter — в форпост. Всё хранит gy_save.gd.
+## Этот узел — корень сцены и ведущий; Player (gy_hero.gd) и Hud (gy_hud.gd) — его дети из сцены,
 ## камера, мир, враги, снаряды и души создаются кодом.
 ##
 ## Самопроверка для ИИ: --test-graveyard=seconds:30,auto:1,move:circle,seed:1,report:5,map:winter,quit:1
+## pick:N — в открытом окне выбрать строку N (вместе с shop); at:x:z — поставить героя в форпосте в точку.
 ## seconds — длина раунда; auto — без меню и с автоматическим выбором прокачки; move — автопилот героя
 ## (circle кружит вокруг центра, away убегает от ближайшего врага, relic бежит к реликвии, none стоит);
 ## boss:секунда — когда выходит босс; rate — множитель частоты появления врагов; skin — имя скина;
 ## seed — сид карты; zoom — множитель расстояния камеры; map — id карты (old, swamp, winter, village, forest,
 ## bloodmoon, pumpkin, road, quarry, lair); quit — выйти из игры после конца раунда (код 0);
-## fx:0 — без частиц. Каждые report секунд печатает «Кладбище [t с]: …», в конце «Кладбище: итог …».
+## fx:0 — без частиц; base — сразу в форпост; shop:id — через секунду открыть окно здания (altar, gate, camp,
+## home, fence) для снимка; souls:N — выдать N душ; unlock:all — открыть все карты.
+## Каждые report секунд печатает «Кладбище [t с]: …», в конце «Кладбище: итог …».
 
 const MODELS := "res://assets/kenney/graveyard/models/"
 const SOUNDS := "res://assets/kenney/graveyard/sounds/"
@@ -65,6 +70,18 @@ const UPGRADES := [
 	{"id": "pierce", "title": "Пробивание", "text": "Снаряд пробивает ещё одного врага"},
 	{"id": "regen", "title": "Восстановление", "text": "+1 здоровья в секунду"},
 ]
+## Постоянная прокачка на Алтаре душ: level растёт за души, cost — цена первого уровня (дальше × (уровень+1)).
+const PERMANENT := [
+	{"id": "body", "title": "Крепкое тело", "text": "+10 к здоровью за уровень", "max": 5, "cost": 30},
+	{"id": "arrows", "title": "Острые стрелы", "text": "+8% к урону за уровень", "max": 5, "cost": 40},
+	{"id": "legs", "title": "Лёгкие ноги", "text": "+5% к скорости бега за уровень", "max": 5, "cost": 35},
+	{"id": "hands", "title": "Быстрые руки", "text": "+6% к скорострельности за уровень", "max": 5, "cost": 45},
+	{"id": "greed", "title": "Жадные руки", "text": "Магнит душ +20% за уровень", "max": 5, "cost": 25},
+	{"id": "luck", "title": "Везение", "text": "Тыквы чаще, реликвия раньше", "max": 3, "cost": 50},
+	{"id": "harvest", "title": "Жатва", "text": "+10% душ за ночь за уровень", "max": 5, "cost": 60},
+]
+const FENCE_COST := [80, 160, 320]
+const FENCE_SHIELD := 30.0  # щит за каждый уровень укреплений
 const RELIC_FIRST := 25.0  # первая реликвия на этой секунде (--test graveyard=relic:сек меняет)
 const RELIC_EVERY := 40.0  # пауза до следующей после того, как взяли или исчезла
 const RELIC_LIFETIME := 30.0  # сколько лежит, последние 5 с мигает
@@ -78,18 +95,19 @@ const Maps := preload("res://game/gy_maps.gd")
 const World := preload("res://game/gy_world.gd")
 const Save := preload("res://game/gy_save.gd")
 const Fx := preload("res://game/gy_fx.gd")
+const Base := preload("res://game/gy_base.gd")
 ## Цвет искр, которыми рассыпается погибший враг (по модели; подкрашенные — по своей подкраске).
 const DEATH_COLORS := {"zombie": "#7cff5a", "skeleton": "#ffffff", "ghost": "#8ad8ff", "vampire": "#ff3a3a", "character": "#ffd0a0"}
 
 ## Что открыть после перезапуска сцены (статические поля переживают reload_current_scene):
-## карта и начинать ли сразу (R — ещё раз) или показать меню (Enter — в меню).
+## next_state — "play" (ночь на карте next_map), "base" (форпост) или "" (меню).
 static var next_map := ""
-static var next_start := false
+static var next_state := ""
 
 @export var round_seconds := 180.0
 @export var decor_seed := 0  # 0 = каждый раз новая карта
 
-var state := "menu"  # menu, playing, levelup, won, over
+var state := "menu"  # menu, base, shop, playing, levelup, won, over
 var map_id := "old"
 var map: Dictionary = {}
 var arena := Vector2(34, 34)  # половина сторон арены, по краю ограда
@@ -109,7 +127,12 @@ var test_options := {}
 var player: CharacterBody3D
 var hud: CanvasLayer
 var world: Node3D
+var base: Node3D = null  # форпост (только в состоянии base/shop)
 var bolts_root: Node3D
+var souls_earned := 0  # души за эту ночь
+var boss_killed := false
+var shop_id := ""
+var shop_rows: Array = []
 
 var _spawn_budget := 0.0
 var _report_every := 0.0
@@ -135,16 +158,31 @@ var _guard: Node3D = null
 var _fx_root: Node3D
 var _quit_on_end := false
 var _end_timer := 0.0
+var _shop_timer := 0.0
 
 
 func _ready() -> void:
 	_parse_test_args()
 	_rng.seed = decor_seed if decor_seed != 0 else randi()
 	Save.load_data()
+	if test_options.has("souls"):
+		Save.data["souls"] = int(test_options["souls"])
+	if test_options.has("unlock"):
+		for id in Maps.ids():
+			Save.unlock(id)
+	var mode := next_state
+	if mode == "":
+		if test_options.has("base"):
+			mode = "base"
+		elif test_options.has("map") or test_options.has("auto") or test_options.has("move"):
+			mode = "play"
 	map_id = str(test_options.get("map", next_map if next_map != "" else "old"))
 	if Maps.index_of(map_id) < 0:
 		push_warning("Кладбище: нет карты «%s», открываю старый погост" % map_id)
 		map_id = "old"
+	if mode == "base":
+		_setup_base()
+		return
 	map = Maps.get_map(map_id)
 	player = get_node_or_null("Player")
 	hud = get_node_or_null("Hud")
@@ -165,7 +203,7 @@ func _ready() -> void:
 	boss_time = float(test_options["boss"]) if test_options.has("boss") else round_seconds * 0.8
 	_report_every = float(test_options.get("report", 0.0))
 	_forced_levelup = float(test_options.get("levelup", 0.0))  # на этой секунде открыть окно прокачки (для снимков)
-	_relic_timer = float(test_options.get("relic", RELIC_FIRST))
+	_relic_timer = float(test_options.get("relic", maxf(RELIC_FIRST - 4.0 * Save.upgrade_level("luck"), 8.0)))
 	hold_levelup = _forced_levelup > 0.0
 	_quit_on_end = test_options.has("quit")
 	auto = test_options.has("auto") or test_options.has("move")
@@ -181,13 +219,57 @@ func _ready() -> void:
 	if hud != null:
 		hud.game = self
 	print("Кладбище готово: карта %s «%s», раунд %d с, босс %s на %d с, скин %s, сид %d" % [map_id, str(map["title"]), int(round_seconds), str(map["boss"]), int(boss_time), SKINS[skin_index], _rng.seed])
-	var start_now := auto or next_start
+	var start_now := auto or mode == "play"
 	next_map = ""
-	next_start = false
+	next_state = ""
 	if start_now:
 		start_game()
 	else:
 		_enter_menu()
+
+
+## Форпост: мир по карте «base», здания и стражники из gy_base.gd, герой ходит, табло показывает души и подсказку.
+func _setup_base() -> void:
+	next_map = ""
+	next_state = ""
+	map_id = "base"
+	map = Maps.get_map("base")
+	player = get_node_or_null("Player")
+	hud = get_node_or_null("Hud")
+	_enemies_root = _make_root("Enemies")
+	_souls_root = _make_root("Souls")
+	bolts_root = _make_root("Bolts")
+	_fx_root = _make_root("Effects")
+	_setup_camera()
+	_setup_sounds()
+	world = World.new()
+	world.name = "World"
+	add_child(world)
+	world.build(map, _rng, str(test_options.get("fx", "1")) != "0")
+	arena = world.arena
+	base = Base.new()
+	base.name = "Base"
+	add_child(base)
+	base.build(self, world, Save.fence_level())
+	skin_index = maxi(SKINS.find(Save.skin()), 0)
+	if player != null:
+		player.game = self
+		player.autopilot = str(test_options.get("move", ""))
+		player.set_skin(SKINS[skin_index])
+		player.set_lantern(false)
+		player.global_position = Vector3(0, 0.95, -2.0)
+		if test_options.has("at"):
+			var at: PackedStringArray = str(test_options["at"]).split(":")
+			if at.size() >= 2:
+				player.global_position = Vector3(float(at[0]), 0.95, float(at[1]))
+	if hud != null:
+		hud.game = self
+		hud.show_base(Save.souls())
+	_menu_light.visible = false
+	state = "base"
+	_quit_on_end = test_options.has("quit")
+	_shop_timer = 1.0 if test_options.has("shop") else 0.0
+	print("Форпост готов: душ %d, укрепления %d, открыто карт %d" % [Save.souls(), Save.fence_level(), Save.data["unlocked"].size()])
 
 
 func _parse_test_args() -> void:
@@ -290,6 +372,27 @@ func _process(delta: float) -> void:
 		_update_camera(delta, true)
 		return
 	_update_camera(delta, false)
+	if state == "base" or state == "shop":
+		base.tick(delta)
+		if _quit_on_end:
+			# Самопроверка форпоста: выйти через seconds секунд.
+			_end_timer += delta
+			if _end_timer >= float(test_options.get("seconds", 5.0)):
+				print("Форпост: стражников %d, нападающих %d, душ %d" % [base.guards.size(), base.attackers.size(), Save.souls()])
+				get_tree().quit(0)
+		if hud != null and state == "base":
+			var spot: Dictionary = base.nearest_spot(player.global_position)
+			hud.set_prompt("E — %s" % str(spot["title"]) if not spot.is_empty() else "")
+		if _shop_timer > 0.0:
+			_shop_timer -= delta
+			if _shop_timer <= 0.0:
+				if state == "base":
+					open_shop(str(test_options["shop"]))
+					if test_options.has("pick"):
+						_shop_timer = 0.5  # самопроверка: через полсекунды выбрать строку pick
+				else:
+					shop_pick(int(test_options["pick"]))
+		return
 	if state == "won" or state == "over":
 		if _quit_on_end:
 			_end_timer += delta
@@ -325,7 +428,8 @@ func _update_camera(delta: float, menu: bool) -> void:
 		target = player.global_position + Vector3(0, 1.35, 4.3)
 		look = player.global_position + Vector3(0, 0.55, 0)
 	else:
-		target = player.global_position + Vector3(0, 9.5, 6.0) * float(test_options.get("zoom", 1.0))
+		var zoom := float(test_options.get("zoom", 1.0)) * (1.3 if state == "base" or state == "shop" else 1.0)
+		target = player.global_position + Vector3(0, 9.5, 6.0) * zoom
 		look = player.global_position + Vector3(0, 0.5, 0)
 	_camera.position = _camera.position.lerp(target, 1.0 - exp(-6.0 * delta))
 	_camera.look_at(look, Vector3.UP)
@@ -392,19 +496,23 @@ func _spawn_enemy(kind: String, at: Vector3 = Vector3.INF) -> Node3D:
 
 func on_enemy_died(enemy: Node3D) -> void:
 	enemies.erase(enemy)
-	kills += 1
 	var pos := enemy.global_position
 	var stats: Dictionary = ENEMY_KINDS[enemy.kind]
 	var color := Color(str(stats.get("tint", DEATH_COLORS.get(str(stats.get("model", "zombie")), "#ffffff"))))
 	spawn_burst(pos + Vector3(0, 0.6, 0), color, 3.0 if enemy.is_boss else 1.0)
+	if enemy.base_target != Vector3.INF:
+		play_sound("die_" + str(stats.get("model", "zombie")))  # нападающий на форпост: без душ и счёта
+		return
+	kills += 1
 	_spawn_soul(pos, ceili(float(enemy.xp) * float(map["xp_mult"])), "soul")
 	if enemy.is_boss:
+		boss_killed = true
 		_spawn_soul(pos + Vector3(1, 0, 0), 0, "pumpkin")
 		play_sound("boss")
 		if hud != null:
 			hud.show_banner("%s повержен!" % enemy.title)
 		print("Босс %s повержен на %d с" % [enemy.title, int(elapsed)])
-	elif _rng.randf() < float(map["pumpkin_chance"]):
+	elif _rng.randf() < float(map["pumpkin_chance"]) + 0.03 * Save.upgrade_level("luck"):
 		_spawn_soul(pos + Vector3(0.6, 0, 0), 0, "pumpkin")
 	if enemy.is_boss:
 		pass
@@ -671,28 +779,41 @@ func score() -> int:
 	return kills * 10 + (level - 1) * 50 + int(elapsed)
 
 
-func _win() -> void:
-	state = "won"
+## Души за ночь: по одной за убитого, по пять за уровень, 40 за босса, за победу 80 плюс 30 за номер карты;
+## Жатва на алтаре добавляет по 10 % за уровень.
+func souls_for_night(won: bool) -> int:
+	var amount := kills + (level - 1) * 5 + (40 if boss_killed else 0)
+	if won:
+		amount += 80 + 30 * Maps.index_of(map_id)
+	return ceili(float(amount) * (1.0 + 0.1 * Save.upgrade_level("harvest")))
+
+
+func _finish_round(won: bool) -> void:
+	state = "won" if won else "over"
 	var s := score()
-	var new_best := Save.set_record(map_id, s, true)
+	var new_best := Save.set_record(map_id, s, won)
 	best_score = Save.record(map_id)
-	play_sound("win")
+	souls_earned = souls_for_night(won)
+	Save.add_souls(souls_earned)
+	Save.add_stat("nights", 1)
+	Save.add_stat("kills", kills)
+	if won:
+		Save.add_stat("wins", 1)
+	play_sound("win" if won else "over")
 	if hud != null:
-		hud.show_message("Ты выжил!\n%s пройден%s\nСчёт %d, рекорд %d\nR: ещё раз · Enter: в меню" % [str(map["title"]), " — новый рекорд!" if new_best else "", s, best_score])
-	_report("итог (победа)")
+		var head := "Ты выжил! %s пройден%s" % [str(map["title"]), " — новый рекорд!" if new_best else ""] if won else "Тебя одолели%s" % (" — но это новый рекорд!" if new_best else "")
+		hud.show_message("%s\nСчёт %d · рекорд %d\n✦ Души: +%d (всего %d)\nEnter — в форпост · R — ещё раз" % [head, s, best_score, souls_earned, Save.souls()])
+	_report("итог (%s), душ +%d" % ["победа" if won else "поражение", souls_earned])
+
+
+func _win() -> void:
+	_finish_round(true)
 
 
 func game_over() -> void:
 	if state != "playing":
 		return
-	state = "over"
-	var s := score()
-	var new_best := Save.set_record(map_id, s, false)
-	best_score = Save.record(map_id)
-	play_sound("over")
-	if hud != null:
-		hud.show_message("Тебя одолели\nСчёт %d%s, рекорд %d\nR: ещё раз · Enter: в меню" % [s, " — новый рекорд!" if new_best else "", best_score])
-	_report("итог (поражение)")
+	_finish_round(false)
 
 
 func _report(label: String) -> void:
@@ -704,53 +825,34 @@ func _report(label: String) -> void:
 func restart() -> void:
 	get_tree().paused = false
 	next_map = map_id
-	next_start = true
+	next_state = "play"
 	print("Перезапуск карты %s" % map_id)
 	get_tree().reload_current_scene()
 
 
-## Enter после конца: назад в меню с той же картой в выборе.
-func to_menu() -> void:
+## Enter после конца или в меню: в форпост.
+func to_base() -> void:
 	get_tree().paused = false
-	next_map = map_id
-	next_start = false
-	print("Возврат в меню")
+	next_map = ""
+	next_state = "base"
+	print("В форпост")
 	get_tree().reload_current_scene()
 
 
-# --- Меню: выбор карты и героя ---
+## Из ворот форпоста: в ночь на выбранную карту.
+func go_to_map(id: String) -> void:
+	next_map = id
+	next_state = "play"
+	print("В путь: карта %s" % id)
+	get_tree().reload_current_scene()
+
+
+# --- Меню ---
 
 func _enter_menu() -> void:
 	state = "menu"
-	_show_menu()
-
-
-func _show_menu() -> void:
 	if hud != null:
-		hud.show_menu(Maps.index_of(map_id) + 1, Maps.ids().size(), str(map["title"]), str(map["subtitle"]), best_score, Save.is_won(map_id),
-			str(SKIN_TITLES.get(SKINS[skin_index], SKINS[skin_index])))
-
-
-## ← → в меню: другая карта. Мир строится заново, поэтому сцена перезапускается с нужной картой.
-func menu_map(step: int) -> void:
-	if state != "menu":
-		return
-	var ids := Maps.ids()
-	var index := posmod(Maps.index_of(map_id) + step, ids.size())
-	play_sound("click")
-	next_map = ids[index]
-	next_start = false
-	get_tree().reload_current_scene()
-
-
-func menu_skin(step: int) -> void:
-	if state != "menu":
-		return
-	skin_index = posmod(skin_index + step, SKINS.size())
-	player.set_skin(SKINS[skin_index])
-	Save.set_skin(SKINS[skin_index])
-	play_sound("click")
-	_show_menu()
+		hud.show_menu(Save.souls(), Save.stat("nights"))
 
 
 func start_game() -> void:
@@ -758,10 +860,179 @@ func start_game() -> void:
 		return
 	state = "playing"
 	player.rotation.y = 0.0
+	_apply_permanent()
 	if _menu_light != null:
 		_menu_light.visible = false
 	if hud != null:
 		hud.hide_menu()
 		hud.set_map_title(str(map["title"]))
+		hud.set_souls(Save.souls())
 	play_sound("click")
-	print("Кладбище: раунд начался, карта %s, герой %s" % [map_id, SKINS[skin_index]])
+	print("Кладбище: раунд начался, карта %s, герой %s, щит %d" % [map_id, SKINS[skin_index], int(player.shield)])
+
+
+## Постоянная прокачка с Алтаря душ и щит от укреплений действуют с начала каждой ночи.
+func _apply_permanent() -> void:
+	player.max_hp += 10.0 * Save.upgrade_level("body")
+	player.hp = player.max_hp
+	player.damage *= 1.0 + 0.08 * Save.upgrade_level("arrows")
+	player.speed *= 1.0 + 0.05 * Save.upgrade_level("legs")
+	player.fire_interval /= 1.0 + 0.06 * Save.upgrade_level("hands")
+	player.magnet *= 1.0 + 0.2 * Save.upgrade_level("greed")
+	player.shield = FENCE_SHIELD * Save.fence_level()
+
+
+# --- Форпост: здания и их окна ---
+
+## E у здания: открыть его окно (список строк, Enter выбирает).
+func interact() -> void:
+	if state != "base" or base == null:
+		return
+	var spot: Dictionary = base.nearest_spot(player.global_position)
+	if spot.is_empty():
+		return
+	open_shop(str(spot["id"]))
+
+
+func open_shop(id: String) -> void:
+	if id == "forge":
+		play_sound("click")
+		if hud != null:
+			hud.show_banner("Кузница пока закрыта: кузнец придёт на следующем этапе")
+		return
+	shop_id = id
+	state = "shop"
+	play_sound("select")
+	_refresh_shop(0)
+	print("Открыто окно: %s" % id)
+
+
+func _refresh_shop(selected: int) -> void:
+	shop_rows = _shop_rows(shop_id)
+	if hud != null:
+		hud.set_souls(Save.souls())
+		hud.show_shop(_shop_title(shop_id), shop_rows, _shop_hint(shop_id), selected)
+
+
+func close_shop() -> void:
+	if state != "shop":
+		return
+	state = "base"
+	play_sound("click")
+	if hud != null:
+		hud.hide_shop()
+
+
+func _shop_title(id: String) -> String:
+	match id:
+		"altar": return "Алтарь душ — постоянная прокачка"
+		"gate": return "Ворота — куда идём этой ночью?"
+		"camp": return "Костёр — кто пойдёт в ночь?"
+		"home": return "Дом сторожа — летопись"
+		"fence": return "Башня — укрепления форпоста"
+	return id
+
+
+func _shop_hint(id: String) -> String:
+	match id:
+		"gate": return "↑ ↓ выбрать · Enter — в путь или открыть за души · Esc — назад"
+		"home": return "Esc — назад"
+	return "↑ ↓ выбрать · Enter — купить · Esc — назад"
+
+
+## Строки окна: title, text, right (цена/уровень), locked (серым), action (что делает Enter).
+func _shop_rows(id: String) -> Array:
+	var rows: Array = []
+	var souls := Save.souls()
+	match id:
+		"altar":
+			for u in PERMANENT:
+				var level := Save.upgrade_level(str(u["id"]))
+				var maxed := level >= int(u["max"])
+				var cost := int(u["cost"]) * (level + 1)
+				rows.append({"id": u["id"], "title": "%s  %s" % [str(u["title"]), _dots(level, int(u["max"]))], "text": str(u["text"]),
+					"right": "максимум" if maxed else "✦ %d" % cost, "locked": maxed or souls < cost, "action": "" if maxed else "buy"})
+		"gate":
+			for map_entry_id in Maps.ids():
+				var m := Maps.get_map(map_entry_id)
+				var unlocked := Save.is_unlocked(map_entry_id)
+				var cost := Maps.unlock_cost(map_entry_id)
+				var record := Save.record(map_entry_id)
+				var right := ("✓ пройдена" if Save.is_won(map_entry_id) else "открыта") if unlocked else "открыть: ✦ %d" % cost
+				var text := str(m["subtitle"]).split(".")[0] + ("  ·  рекорд %d" % record if record > 0 else "")
+				rows.append({"id": map_entry_id, "title": "%d. %s" % [Maps.index_of(map_entry_id) + 1, str(m["title"])], "text": text,
+					"right": right, "locked": not unlocked and souls < cost, "action": "play" if unlocked else "unlock"})
+		"camp":
+			for skin in SKINS:
+				rows.append({"id": skin, "title": str(SKIN_TITLES.get(skin, skin)), "text": "", "right": "выбран" if skin == SKINS[skin_index] else "", "locked": false, "action": "skin"})
+		"home":
+			rows.append({"id": "", "title": "Ночей: %d · побед: %d · убито нечисти: %d · душ собрано: %d" % [Save.stat("nights"), Save.stat("wins"), Save.stat("kills"), Save.stat("souls_total")],
+				"text": "", "right": "", "locked": false, "action": ""})
+			for map_entry_id in Maps.ids():
+				var record := Save.record(map_entry_id)
+				rows.append({"id": map_entry_id, "title": "%d. %s" % [Maps.index_of(map_entry_id) + 1, Maps.title_of(map_entry_id)], "text": "",
+					"right": ("рекорд %d" % record if record > 0 else "—") + ("  ✓" if Save.is_won(map_entry_id) else ""), "locked": false, "action": ""})
+		"fence":
+			var level := Save.fence_level()
+			var maxed := level >= FENCE_COST.size()
+			var cost := 0 if maxed else int(FENCE_COST[level])
+			rows.append({"id": "fence", "title": "Укрепления  %s" % _dots(level, FENCE_COST.size()), "text": "Щит %d здоровья в начале каждой ночи, стражников %d" % [int(FENCE_SHIELD * level), 4 + 2 * maxi(level - 1, 0)],
+				"right": "максимум" if maxed else "✦ %d" % cost, "locked": maxed or souls < cost, "action": "" if maxed else "buy"})
+	return rows
+
+
+func _dots(level: int, max_level: int) -> String:
+	var text := ""
+	for i in max_level:
+		text += "●" if i < level else "○"
+	return text
+
+
+## Enter в окне: купить, выбрать героя или пойти в ночь.
+func shop_pick(index: int) -> void:
+	if state != "shop" or index < 0 or index >= shop_rows.size():
+		return
+	var row: Dictionary = shop_rows[index]
+	match str(row["action"]):
+		"buy":
+			if shop_id == "fence":
+				var level := Save.fence_level()
+				if Save.spend(int(FENCE_COST[level])):
+					Save.set_fence_level(level + 1)
+					play_sound("levelup")
+					print("Куплено: укрепления %d" % (level + 1))
+				else:
+					play_sound("hover")
+			else:
+				for u in PERMANENT:
+					if str(u["id"]) != str(row["id"]):
+						continue
+					var level := Save.upgrade_level(str(u["id"]))
+					if Save.spend(int(u["cost"]) * (level + 1)):
+						Save.set_upgrade_level(str(u["id"]), level + 1)
+						play_sound("levelup")
+						print("Куплено: %s %d" % [str(u["title"]), level + 1])
+					else:
+						play_sound("hover")
+			_refresh_shop(index)
+		"unlock":
+			if Save.spend(Maps.unlock_cost(str(row["id"]))):
+				Save.unlock(str(row["id"]))
+				play_sound("relic")
+				print("Открыта карта %s" % str(row["id"]))
+				if hud != null:
+					hud.show_banner("Открыт %s!" % Maps.title_of(str(row["id"])))
+			else:
+				play_sound("hover")
+			_refresh_shop(index)
+		"play":
+			get_tree().paused = false
+			go_to_map(str(row["id"]))
+		"skin":
+			skin_index = maxi(SKINS.find(str(row["id"])), 0)
+			player.set_skin(SKINS[skin_index])
+			Save.set_skin(SKINS[skin_index])
+			play_sound("click")
+			_refresh_shop(index)
+		_:
+			play_sound("hover")

@@ -42,6 +42,30 @@ const DEFAULT := {
 	},
 }
 
+## Форпост между боями (gy_base.gd ставит на нём здания, стражников и нападающих): тёплый свет, деревянный
+## забор с воротами на севере, места под здания заняты заранее (reserved: x, z, радиус).
+const BASE := {
+	"id": "base",
+	"title": "Форпост",
+	"subtitle": "Дом сторожа между ночами.",
+	"round": 0.0,
+	"arena": [16.0, 11.0],
+	"sky": {"top": "#0a1028", "horizon": "#2c3454", "ground": "#141a2c", "moon": "#f8f0d8", "moon_size": 0.04, "stars": 1.1, "haze": "#2c3454"},
+	"env": {"bg": "#1a2238", "ambient": "#8c8aa0", "ambient_energy": 1.1, "fog": "#343e5c", "fog_density": 0.012,
+		"moon": "#e4e0ff", "moon_energy": 1.1, "exposure": 1.15, "saturation": 1.08},
+	"ground": {"grass_dark": "#2a4420", "grass_light": "#466a2c", "dirt": "#4d3a29", "path": "#7a6040", "path_width": 1.1, "paths": 1},
+	"decor": {"graves": 4, "grave_props": 2, "pines": 0, "rocks": 3, "furniture": 4, "pumpkins": 10, "crypts": 0, "obelisks": 0,
+		"outer_pines": 90, "outer_rocks": 12, "fence": "fence", "gate": true,
+		"reserved": [[-9.0, -2.0, 4.5], [9.0, -2.5, 4.5], [0.0, 2.5, 3.0], [0.0, 7.5, 4.5], [0.0, -9.5, 4.0], [-5.0, -9.0, 2.5], [5.0, -9.0, 2.5]]},
+	"lights": {"fires": 0, "lanterns": 5, "posts": 0, "range": 11.0, "energy": 1.0, "hero_lantern": false},
+	"weather": {"kind": "leaves", "fireflies": true, "wisps": false},
+	"hazards": {"ice": 0, "mud": 0},
+	"enemies": {},
+}
+
+## Сколько душ стоит открыть карту (по порядку); первая открыта всегда.
+const UNLOCK_COST := [0, 60, 120, 200, 300, 420, 560, 720, 900, 1200]
+
 const MAPS := [
 	{"id": "old"},
 	{
@@ -272,6 +296,8 @@ const MAPS := [
 ## Полное описание карты: поля карты поверх DEFAULT (вложенные словари тоже сливаются).
 static func get_map(id: String) -> Dictionary:
 	var result: Dictionary = _merge(DEFAULT, {})
+	if id == "base":
+		return _merge(DEFAULT, BASE)
 	for entry in MAPS:
 		if str(entry["id"]) == id:
 			result = _merge(DEFAULT, entry)
@@ -308,3 +334,8 @@ static func index_of(id: String) -> int:
 
 static func title_of(id: String) -> String:
 	return str(get_map(id)["title"])
+
+
+static func unlock_cost(id: String) -> int:
+	var index := index_of(id)
+	return int(UNLOCK_COST[index]) if index >= 0 and index < UNLOCK_COST.size() else 0

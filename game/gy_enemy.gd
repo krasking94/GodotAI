@@ -26,6 +26,7 @@ var is_guard := false  # сторож реликвии: кружит вокру�
 var guard_target: Node3D = null
 var title := ""
 var immune: Array = []  # лужи, которые не замедляют (ice, mud)
+var base_target := Vector3.INF  # нападающий на форпост: идёт не к герою, а к этой точке у забора и бьёт забор
 var game: Node = null
 
 static var _tinted := {}  # кэш подкрашенных материалов: ключ «вид:материал»
@@ -163,14 +164,21 @@ func _apply_tint(tint: Color) -> void:
 
 func _physics_process(delta: float) -> void:
 	_anim += delta
-	if game == null or str(game.get("state")) != "playing":
+	if game == null:
+		return
+	var state := str(game.get("state"))
+	if base_target == Vector3.INF and state != "playing":
+		return
+	if base_target != Vector3.INF and state != "base" and state != "shop":
 		return
 	var player: Node3D = game.get("player")
 	if player == null:
 		return
 	var target := player.global_position
 	var chasing := true
-	if is_guard and guard_target != null and is_instance_valid(guard_target):
+	if base_target != Vector3.INF:
+		target = base_target
+	elif is_guard and guard_target != null and is_instance_valid(guard_target):
 		var center: Vector3 = guard_target.global_position
 		if player.global_position.distance_to(center) > 7.0:
 			# Герой далеко: кружим вокруг реликвии.
@@ -243,7 +251,11 @@ func _physics_process(delta: float) -> void:
 
 
 ## Удар по герою: урон, искры и звук; герой 0,4 с неуязвим, поэтому толпа не бьёт десять раз за кадр.
+## Нападающий на форпост бьёт по забору: только искры, без урона.
 func _strike(player: Node3D) -> void:
+	if base_target != Vector3.INF:
+		game.spawn_burst(global_position + Vector3(0, 0.7, 0) + (base_target - global_position).normalized() * 0.5, Color("#c8b08a"), 0.4)
+		return
 	if is_guard:
 		player.take_damage(float(player.get("max_hp")) * 0.5)
 		game.spawn_burst(player.global_position + Vector3(0, 0.9, 0), Color("#ff3a3a"), 1.5)

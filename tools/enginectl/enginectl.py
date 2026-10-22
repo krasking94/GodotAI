@@ -592,6 +592,8 @@ SETUP_FILES = [  # что копируется: (откуда относител
     ("game/gy_maps.gd", "game/gy_maps.gd"),
     ("game/gy_world.gd", "game/gy_world.gd"),
     ("game/gy_save.gd", "game/gy_save.gd"),
+    ("game/gy_base.gd", "game/gy_base.gd"),
+    ("game/gy_guard.gd", "game/gy_guard.gd"),
     ("game/gy_sky.gdshader", "game/gy_sky.gdshader"),
     ("game/gy_ice.gdshader", "game/gy_ice.gdshader"),
     ("tools/enginectl/examples/graveyard.json", "tools/enginectl/examples/graveyard.json"),

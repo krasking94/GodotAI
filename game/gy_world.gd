@@ -19,6 +19,7 @@ var map: Dictionary = {}
 var arena := Vector2(34, 34)
 var rng := RandomNumberGenerator.new()
 var solid_spots: Array = []  # Vector2 занятых мест, чтобы украшения не лезли друг в друга
+var reserved: Array = []  # [Vector2 центр, радиус] — места под здания базы, украшения туда не ставятся
 var hazards: Array = []  # [Vector2 центр, радиус, вид]
 var fires: Array = []  # [OmniLight3D, фаза, энергия] для мерцания
 var fx_enabled := true
@@ -43,6 +44,8 @@ func build(map_def: Dictionary, seed_rng: RandomNumberGenerator, fx: bool) -> vo
 	_decor_root = _make_root("Decor")
 	_hazard_root = _make_root("Hazards")
 	_weather_root = _make_root("Weather")
+	for item in map["decor"].get("reserved", []):
+		reserved.append([Vector2(float(item[0]), float(item[1])), float(item[2])])
 	_setup_environment()
 	_setup_ground()
 	_build_fence()
@@ -171,12 +174,19 @@ func _setup_ground() -> void:
 
 func _build_fence() -> void:
 	var fence_model := str(map["decor"].get("fence", "ironFence"))
-	var step := 1.5 if fence_model == "fence" else 1.0
+	var gate := bool(map["decor"].get("gate", false))
+	var step := 1.25 if fence_model == "fence" else 1.0
 	var x := -arena.x + step * 0.5
 	while x < arena.x:
-		_place(fence_model, Vector3(x, 0, -arena.y), 0.0, 1.0, false)
+		if not (gate and absf(x) < 2.6):
+			_place(fence_model, Vector3(x, 0, -arena.y), 0.0, 1.0, false)
 		_place(fence_model, Vector3(x, 0, arena.y), PI, 1.0, false)
 		x += step
+	if gate:
+		# Ворота на севере: две колонны с фонарями, проём остаётся закрытым невидимой стеной (выход — через выбор карты).
+		for gx in [-2.8, 2.8]:
+			_place("ironFenceBorderColumn", Vector3(gx, 0, -arena.y), 0.0, 1.8, false)
+			place_light("lanternGlass", Vector3(gx, 0, -arena.y + 0.9), 2.2, Color("#ffd27a"), 1.2, true)
 	var z := -arena.y + step * 0.5
 	while z < arena.y:
 		_place(fence_model, Vector3(-arena.x, 0, z), PI * 0.5, 1.0, false)
@@ -289,10 +299,13 @@ func free_spot(spacing: float, min_center: float = 5.0) -> Vector3:
 	return Vector3.INF
 
 
-## Занять место, если рядом нет других предметов.
+## Занять место, если рядом нет других предметов и зданий.
 func _claim(p: Vector2, spacing: float) -> bool:
 	for spot in solid_spots:
 		if p.distance_to(spot) < spacing:
+			return false
+	for item in reserved:
+		if p.distance_to(item[0]) < float(item[1]):
 			return false
 	solid_spots.append(p)
 	return true
@@ -302,6 +315,9 @@ func is_free(p: Vector2, spacing: float) -> bool:
 	for spot in solid_spots:
 		if p.distance_to(spot) < spacing:
 			return false
+	for item in reserved:
+		if p.distance_to(item[0]) < float(item[1]):
+			return false
 	for hazard in hazards:
 		if p.distance_to(hazard[0]) < float(hazard[1]) + 0.5:
 			return false
@@ -310,6 +326,11 @@ func is_free(p: Vector2, spacing: float) -> bool:
 
 func _place(model_name: String, pos: Vector3, rot_y: float, scale_factor: float, solid: bool) -> Node3D:
 	return _place_from(MODELS + model_name + ".glb", model_name, pos, rot_y, scale_factor, solid)
+
+
+## Поставить модель по полному пути (для зданий базы из gy_base.gd).
+func place_model(path: String, model_name: String, pos: Vector3, rot_y: float, scale_factor: float, solid: bool) -> Node3D:
+	return _place_from(path, model_name, pos, rot_y, scale_factor, solid)
 
 
 func _place_from(path: String, model_name: String, pos: Vector3, rot_y: float, scale_factor: float, solid: bool) -> Node3D:
