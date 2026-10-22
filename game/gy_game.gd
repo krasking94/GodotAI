@@ -144,11 +144,11 @@ func _setup_environment() -> void:
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color("#06080f")
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("#3b4866")
-	env.ambient_light_energy = 1.0
+	env.ambient_light_color = Color("#4d5f88")
+	env.ambient_light_energy = 1.1
 	env.fog_enabled = true
-	env.fog_light_color = Color("#0b1020")
-	env.fog_density = 0.02
+	env.fog_light_color = Color("#141c30")
+	env.fog_density = 0.012
 	env.glow_enabled = true
 	env.glow_intensity = 0.5
 	env.glow_bloom = 0.05
@@ -160,24 +160,17 @@ func _setup_environment() -> void:
 	var moon := DirectionalLight3D.new()
 	moon.name = "Moon"
 	moon.rotation_degrees = Vector3(-55, 35, 0)
-	moon.light_color = Color("#8fa4d8")
-	moon.light_energy = 0.7
+	moon.light_color = Color("#a3b6e4")
+	moon.light_energy = 0.9
 	moon.shadow_enabled = true
 	add_child(moon)
 	# Земля плитками по 10 м: в режиме совместимости на одну сетку действует не больше 8 источников света.
 	var ground := StaticBody3D.new()
 	ground.name = "Ground"
 	ground.collision_layer = 1
-	var material := ShaderMaterial.new()
-	material.shader = load("res://game/grid.gdshader")
-	material.set_shader_parameter("color_a", Color("#1b261d"))
-	material.set_shader_parameter("color_b", Color("#17211a"))
-	material.set_shader_parameter("line_color", Color("#223024"))
-	material.set_shader_parameter("cell", 2.0)
-	material.set_shader_parameter("line_width", 0.06)
 	var tile := PlaneMesh.new()
 	tile.size = Vector2(10, 10)
-	tile.material = material
+	tile.material = _ground_material()
 	for ix in range(-4, 4):
 		for iz in range(-4, 4):
 			var mesh := MeshInstance3D.new()
@@ -191,6 +184,29 @@ func _setup_environment() -> void:
 	shape.position = Vector3(0, -0.1, 0)
 	ground.add_child(shape)
 	add_child(ground)
+
+
+## Трава с пятнами земли: бесшовный шум FastNoiseLite, раскрашенный градиентом (земля → тёмная трава → светлая).
+func _ground_material() -> StandardMaterial3D:
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	noise.seed = 7
+	noise.frequency = 0.007
+	noise.fractal_octaves = 3
+	var ramp := Gradient.new()
+	ramp.offsets = PackedFloat32Array([0.0, 0.3, 0.45, 0.72, 1.0])
+	ramp.colors = PackedColorArray([Color("#3a3426"), Color("#41402a"), Color("#2f5233"), Color("#36603a"), Color("#3f6e41")])
+	var texture := NoiseTexture2D.new()
+	texture.width = 512
+	texture.height = 512
+	texture.seamless = true
+	texture.noise = noise
+	texture.color_ramp = ramp
+	var material := StandardMaterial3D.new()
+	material.albedo_texture = texture
+	material.uv1_scale = Vector3(2, 2, 1)
+	material.roughness = 1.0
+	return material
 
 
 func _setup_camera() -> void:
@@ -247,6 +263,8 @@ func _build_graveyard() -> void:
 	for crypt_pos in [Vector3(-20, 0, -20), Vector3(21, 0, -18), Vector3(-19, 0, 22), Vector3(20, 0, 21)]:
 		_place("crypt", crypt_pos, _rng.randf_range(0, TAU), 2.6, true)
 		_place_light("lightpostSingle", crypt_pos + Vector3(2.6, 0, 1.2), 1.6, Color("#ffd27a"), 1.6, false)
+	for crypt_pos in [Vector3(-20, 0, -20), Vector3(21, 0, -18), Vector3(-19, 0, 22), Vector3(20, 0, 21)]:
+		_lay_path(Vector3.ZERO, crypt_pos)
 	var graves := ["gravestoneBevel", "gravestoneBroken", "gravestoneCross", "gravestoneCrossLarge", "gravestoneDecorative",
 		"gravestoneFlat", "gravestoneRound", "gravestoneWide", "gravestoneRoof", "cross", "crossWood", "pillarObelisk"]
 	_scatter(graves, 72, 1.0, 1.25, true, 1.3)
@@ -264,6 +282,26 @@ func _build_graveyard() -> void:
 		if pos != Vector3.INF:
 			_place_light("lanternCandle", pos, 2.0, Color("#ffd27a"), 1.0, false)
 	print("Кладбище построено: %d украшений" % _decor_root.get_child_count())
+
+
+## Дорожка из плиток road: сначала вдоль x, потом вдоль z; плитки занимают место, чтобы на них не ставили могилы.
+func _lay_path(from: Vector3, to: Vector3) -> void:
+	var corner := Vector3(to.x, 0, from.z)
+	for segment in [[from, corner], [corner, to]]:
+		var a: Vector3 = segment[0]
+		var b: Vector3 = segment[1]
+		var length := a.distance_to(b)
+		if length < 1.0:
+			continue
+		var dir := (b - a) / length
+		var rot := 0.0 if absf(dir.x) > absf(dir.z) else PI * 0.5
+		var steps := int(length)
+		for i in range(2, steps - 1):
+			var pos := a + dir * (i + 0.5)
+			if pos.length() < 1.0:
+				continue
+			_place("road", pos, rot, 1.0, false)
+			_solid_spots.append(Vector2(pos.x, pos.z))
 
 
 func _scatter(names: Array, count: int, scale_min: float, scale_max: float, solid: bool, spacing: float) -> void:
@@ -320,8 +358,8 @@ func _place_light(model_name: String, pos: Vector3, scale_factor: float, color: 
 	var light := OmniLight3D.new()
 	light.light_color = color
 	light.light_energy = energy
-	light.omni_range = 9.0
-	light.omni_attenuation = 1.4
+	light.omni_range = 11.0
+	light.omni_attenuation = 1.2
 	light.position = Vector3(pos.x, maxf(box.size.y * 0.9, 0.6), pos.z)
 	_decor_root.add_child(light)
 	if flicker:
