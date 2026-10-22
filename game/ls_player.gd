@@ -86,12 +86,19 @@ func look_dir() -> Vector3:
 	return -camera.global_transform.basis.z
 
 
-func _unhandled_input(event: InputEvent) -> void:
+## Обзор мышью читается в _input, а не в _unhandled_input: иначе движение мыши съедают панели экрана
+## (захваченный курсор стоит в центре окна, прямо на прицеле), и голова не поворачивается.
+func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
+		if game != null and game.has_method("ui_blocks_mouse") and game.ui_blocks_mouse():
+			return
 		rotate_y(-event.relative.x * MOUSE_SENSITIVITY)
 		camera.rotate_x(-event.relative.y * MOUSE_SENSITIVITY)
 		camera.rotation.x = clampf(camera.rotation.x, deg_to_rad(-80.0), deg_to_rad(80.0))
-	elif event.is_action_pressed("interact"):
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("interact"):
 		interact_nearest()
 	elif event.is_action_pressed("jump"):
 		toggle_stand()
