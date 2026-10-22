@@ -142,17 +142,26 @@ func _make_root(root_name: String) -> Node3D:
 func _setup_environment() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("#06080f")
+	env.background_color = Color("#1c2740")
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("#4d5f88")
-	env.ambient_light_energy = 1.1
+	env.ambient_light_color = Color("#8088a8")
+	env.ambient_light_energy = 1.25
+	env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	env.tonemap_exposure = 1.2
 	env.fog_enabled = true
-	env.fog_light_color = Color("#141c30")
+	env.fog_light_color = Color("#3b4a6e")
+	env.fog_light_energy = 1.0
 	env.fog_density = 0.012
+	# Мягкие тени в углах у камней и деревьев (работает в Forward+ и Mobile, в режиме совместимости просто не рисуется).
+	env.ssao_enabled = true
+	env.ssao_radius = 1.0
+	env.ssao_intensity = 1.5
 	env.glow_enabled = true
-	env.glow_intensity = 0.5
-	env.glow_bloom = 0.05
-	env.glow_hdr_threshold = 1.0
+	env.glow_intensity = 0.8
+	env.glow_bloom = 0.08
+	env.glow_hdr_threshold = 0.9
+	env.adjustment_enabled = true
+	env.adjustment_saturation = 1.05
 	var world := WorldEnvironment.new()
 	world.name = "Night"
 	world.environment = env
@@ -160,8 +169,8 @@ func _setup_environment() -> void:
 	var moon := DirectionalLight3D.new()
 	moon.name = "Moon"
 	moon.rotation_degrees = Vector3(-55, 35, 0)
-	moon.light_color = Color("#a3b6e4")
-	moon.light_energy = 0.9
+	moon.light_color = Color("#dde2ff")
+	moon.light_energy = 1.35
 	moon.shadow_enabled = true
 	add_child(moon)
 	# Земля плитками по 10 м: в режиме совместимости на одну сетку действует не больше 8 источников света.
@@ -186,26 +195,11 @@ func _setup_environment() -> void:
 	add_child(ground)
 
 
-## Трава с пятнами земли: бесшовный шум FastNoiseLite, раскрашенный градиентом (земля → тёмная трава → светлая).
-func _ground_material() -> StandardMaterial3D:
-	var noise := FastNoiseLite.new()
-	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	noise.seed = 7
-	noise.frequency = 0.007
-	noise.fractal_octaves = 3
-	var ramp := Gradient.new()
-	ramp.offsets = PackedFloat32Array([0.0, 0.3, 0.45, 0.72, 1.0])
-	ramp.colors = PackedColorArray([Color("#3a3426"), Color("#41402a"), Color("#2f5233"), Color("#36603a"), Color("#3f6e41")])
-	var texture := NoiseTexture2D.new()
-	texture.width = 512
-	texture.height = 512
-	texture.seamless = true
-	texture.noise = noise
-	texture.color_ramp = ramp
-	var material := StandardMaterial3D.new()
-	material.albedo_texture = texture
-	material.uv1_scale = Vector3(2, 2, 1)
-	material.roughness = 1.0
+## Земля рисуется шейдером game/gy_ground.gdshader: трава с пятнами, проплешины, тропинки крест-накрест, цветочки.
+## Узор считается по мировым координатам, поэтому плитки стыкуются без швов.
+func _ground_material() -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = load("res://game/gy_ground.gdshader")
 	return material
 
 
@@ -263,8 +257,6 @@ func _build_graveyard() -> void:
 	for crypt_pos in [Vector3(-20, 0, -20), Vector3(21, 0, -18), Vector3(-19, 0, 22), Vector3(20, 0, 21)]:
 		_place("crypt", crypt_pos, _rng.randf_range(0, TAU), 2.6, true)
 		_place_light("lightpostSingle", crypt_pos + Vector3(2.6, 0, 1.2), 1.6, Color("#ffd27a"), 1.6, false)
-	for crypt_pos in [Vector3(-20, 0, -20), Vector3(21, 0, -18), Vector3(-19, 0, 22), Vector3(20, 0, 21)]:
-		_lay_path(Vector3.ZERO, crypt_pos)
 	var graves := ["gravestoneBevel", "gravestoneBroken", "gravestoneCross", "gravestoneCrossLarge", "gravestoneDecorative",
 		"gravestoneFlat", "gravestoneRound", "gravestoneWide", "gravestoneRoof", "cross", "crossWood", "pillarObelisk"]
 	_scatter(graves, 72, 1.0, 1.25, true, 1.3)
@@ -282,26 +274,6 @@ func _build_graveyard() -> void:
 		if pos != Vector3.INF:
 			_place_light("lanternCandle", pos, 2.0, Color("#ffd27a"), 1.0, false)
 	print("Кладбище построено: %d украшений" % _decor_root.get_child_count())
-
-
-## Дорожка из плиток road: сначала вдоль x, потом вдоль z; плитки занимают место, чтобы на них не ставили могилы.
-func _lay_path(from: Vector3, to: Vector3) -> void:
-	var corner := Vector3(to.x, 0, from.z)
-	for segment in [[from, corner], [corner, to]]:
-		var a: Vector3 = segment[0]
-		var b: Vector3 = segment[1]
-		var length := a.distance_to(b)
-		if length < 1.0:
-			continue
-		var dir := (b - a) / length
-		var rot := 0.0 if absf(dir.x) > absf(dir.z) else PI * 0.5
-		var steps := int(length)
-		for i in range(2, steps - 1):
-			var pos := a + dir * (i + 0.5)
-			if pos.length() < 1.0:
-				continue
-			_place("road", pos, rot, 1.0, false)
-			_solid_spots.append(Vector2(pos.x, pos.z))
 
 
 func _scatter(names: Array, count: int, scale_min: float, scale_max: float, solid: bool, spacing: float) -> void:
