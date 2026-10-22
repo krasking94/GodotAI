@@ -5,6 +5,8 @@ extends Area3D
 
 static var _material: StandardMaterial3D
 
+var game: Node = null  # ведущий раунда (gy_game.gd), для искр при попадании
+
 var _dir := Vector3.FORWARD
 var _speed := 15.0
 var _damage := 12.0
@@ -55,6 +57,8 @@ func _on_body_entered(body: Node3D) -> void:
 	if not body.is_in_group("enemies") or _hit.has(body):
 		return
 	_hit.append(body)
+	if game != null:
+		game.spawn_sparks(global_position)
 	body.take_damage(_damage)
 	_pierce -= 1
 	if _pierce <= 0:

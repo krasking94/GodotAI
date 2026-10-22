@@ -69,6 +69,8 @@ var player: CharacterBody3D
 var hud: CanvasLayer
 var bolts_root: Node3D
 
+const Fx := preload("res://game/gy_fx.gd")
+
 var _spawn_budget := 0.0
 var _report_every := 0.0
 var _report_timer := 0.0
@@ -83,6 +85,9 @@ var _levelup_options: Array = []
 var _fires: Array = []  # [OmniLight3D, фаза] для мерцания
 var _soul_material: StandardMaterial3D
 var _solid_spots: Array = []  # Vector2 занятых мест, чтобы украшения не лезли друг в друга
+var _fx_root: Node3D
+var _fireflies: CPUParticles3D
+var _leaves: CPUParticles3D
 
 
 func _ready() -> void:
@@ -98,6 +103,7 @@ func _ready() -> void:
 	_setup_camera()
 	_setup_sounds()
 	_build_graveyard()
+	_setup_effects()
 	if test_options.has("seconds"):
 		round_seconds = float(test_options["seconds"])
 	boss_time = float(test_options["boss"]) if test_options.has("boss") else round_seconds * 0.8
@@ -239,6 +245,40 @@ func play_sound(sound_name: String) -> void:
 
 # --- Кладбище: ограда, надгробия, склепы, сосны, фонари ---
 
+## Светлячки и листья живут в коробке вокруг героя и едут за ним; искры рождаются при каждом попадании.
+## Отключить для быстрых проверок: --test graveyard=fx:0.
+func _setup_effects() -> void:
+	_fx_root = _make_root("Effects")
+	if str(test_options.get("fx", "1")) == "0":
+		return
+	_fireflies = Fx.fireflies()
+	_fx_root.add_child(_fireflies)
+	_leaves = Fx.leaves()
+	_fx_root.add_child(_leaves)
+	_follow_effects()
+
+
+func _follow_effects() -> void:
+	if player == null:
+		return
+	var pos := player.global_position
+	if _fireflies != null:
+		_fireflies.position = Vector3(pos.x, 1.4, pos.z)
+	if _leaves != null:
+		_leaves.position = Vector3(pos.x, 6.5, pos.z)
+
+
+## Искры в точке попадания снаряда (зовёт gy_bolt.gd).
+func spawn_sparks(pos: Vector3) -> void:
+	if _fx_root == null or str(test_options.get("fx", "1")) == "0":
+		return
+	var sparks := Fx.sparks()
+	_fx_root.add_child(sparks)
+	sparks.global_position = pos + Vector3(0, 0.3, 0)
+	if test_options.has("debug"):
+		print("Искры: попадание в точке (%.1f, %.1f)" % [pos.x, pos.z])
+
+
 func _build_graveyard() -> void:
 	_solid_spots.clear()
 	# Ограда по краю и невидимые стены, чтобы никто не ушёл в туман.
@@ -367,6 +407,7 @@ func _process(delta: float) -> void:
 	for fire in _fires:
 		var light: OmniLight3D = fire[0]
 		light.light_energy = float(fire[2]) * (1.0 + 0.18 * sin(Time.get_ticks_msec() * 0.013 + float(fire[1])) + 0.08 * sin(Time.get_ticks_msec() * 0.031 + float(fire[1]) * 2.0))
+	_follow_effects()
 	if state == "menu":
 		if player != null:
 			player.rotation.y += delta * 0.7
