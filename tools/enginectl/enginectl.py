@@ -589,9 +589,15 @@ SETUP_FILES = [  # что копируется: (откуда относител
     ("game/gy_hud.gd", "game/gy_hud.gd"),
     ("game/gy_ground.gdshader", "game/gy_ground.gdshader"),
     ("game/gy_fx.gd", "game/gy_fx.gd"),
+    ("game/gy_maps.gd", "game/gy_maps.gd"),
+    ("game/gy_world.gd", "game/gy_world.gd"),
+    ("game/gy_save.gd", "game/gy_save.gd"),
+    ("game/gy_sky.gdshader", "game/gy_sky.gdshader"),
+    ("game/gy_ice.gdshader", "game/gy_ice.gdshader"),
     ("tools/enginectl/examples/graveyard.json", "tools/enginectl/examples/graveyard.json"),
 ]
-SETUP_DIRS = ["assets/kenney/platformer", "assets/kenney/graveyard", "assets/kenney/characters"]  # папки копируются целиком (кроме *.import, их создаст Godot)
+# Папки копируются целиком (кроме *.import, их создаст Godot): city и racing нужны картам «Кладбища» (дома, машины).
+SETUP_DIRS = ["assets/kenney/platformer", "assets/kenney/graveyard", "assets/kenney/characters", "assets/kenney/city", "assets/kenney/racing"]
 PLUGIN_ENTRY = 'res://addons/ai_bridge/plugin.cfg'
 MIN_GITIGNORE = "# Служебные папки Godot\n.godot/\n.import/\nexport_presets.cfg\n\n# Сборки\nbuild/\n*.apk\n*.exe\n*.pck\n\n# Секреты\n.env\n*.keystore\n"
 

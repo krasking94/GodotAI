@@ -5,7 +5,8 @@ extends CharacterBody3D
 ## в ближайшего врага. Руки и ноги качаются кодом: у каждой конечности свой шарнир-узел в плече или бедре.
 ## Урон от врага: короткая неуязвимость 0,4 с и красная вспышка; при нуле здоровья зовёт game.game_over().
 ## Параметры (урон, скорострельность, число снарядов, скорость, магнит душ, восстановление) меняет
-## прокачка в gy_game.gd. autopilot для самопроверки: circle, away, none.
+## прокачка в gy_game.gd. На ледяной луже герой чуть скользит (разгон и торможение медленнее), в грязи вязнет
+## (game.world.speed_factor). На тёмных картах в руке фонарь (set_lantern). autopilot для самопроверки: circle, away, relic, none.
 
 const MODEL := "res://assets/kenney/characters/basicCharacter.gltf"
 const SKIN_DIR := "res://assets/kenney/characters/skins/"
@@ -37,6 +38,8 @@ var _hurt_timer := 0.0
 var _flash := 0.0
 var _anim := 0.0
 var _facing := 0.0
+var _lantern: OmniLight3D
+var _lantern_phase := 0.0
 
 
 func _ready() -> void:
@@ -87,22 +90,56 @@ func set_skin(skin: String) -> void:
 		mesh.material_override = _material
 
 
+## Фонарь в руке: тёплый свет вокруг героя, чуть дрожит (для тёмных карт).
+func set_lantern(enabled: bool) -> void:
+	if not enabled:
+		if _lantern != null:
+			_lantern.visible = false
+		return
+	if _lantern == null:
+		_lantern = OmniLight3D.new()
+		_lantern.name = "Lantern"
+		_lantern.light_color = Color("#ffc890")
+		_lantern.light_energy = 1.6
+		_lantern.omni_range = 9.0
+		_lantern.omni_attenuation = 1.3
+		_lantern.position = Vector3(0.5, 0.9, 0.3)
+		add_child(_lantern)
+	_lantern.visible = true
+
+
 func _physics_process(delta: float) -> void:
 	_anim += delta
+	if _lantern != null and _lantern.visible:
+		_lantern_phase += delta
+		_lantern.light_energy = 1.6 + 0.15 * sin(_lantern_phase * 9.0) + 0.1 * sin(_lantern_phase * 23.0)
 	if game == null or str(game.get("state")) != "playing" or not alive:
 		_animate(0.0, delta)
 		return
 	var dir := _input_direction()
-	velocity.x = dir.x * speed
-	velocity.z = dir.z * speed
+	var world: Node = game.get("world")
+	var factor := 1.0
+	var hazard := ""
+	if world != null:
+		hazard = world.hazard_at(global_position)
+		factor = world.speed_factor(global_position, "hero")
+	var wanted := Vector3(dir.x * speed * factor, 0, dir.z * speed * factor)
+	if hazard == "ice":
+		# Лёд: скорость догоняет желаемую медленно, поэтому герой скользит.
+		var k := 1.0 - exp(-2.2 * delta)
+		velocity.x = lerpf(velocity.x, wanted.x, k)
+		velocity.z = lerpf(velocity.z, wanted.z, k)
+	else:
+		velocity.x = wanted.x
+		velocity.z = wanted.z
 	if is_on_floor():
 		velocity.y = 0.0
 	else:
 		velocity.y -= GRAVITY * delta
 	move_and_slide()
-	var limit: float = float(game.get("ARENA")) - 0.7
-	global_position.x = clampf(global_position.x, -limit, limit)
-	global_position.z = clampf(global_position.z, -limit, limit)
+	var arena: Vector2 = game.get("arena")
+	global_position.x = clampf(global_position.x, -arena.x + 0.7, arena.x - 0.7)
+	global_position.z = clampf(global_position.z, -arena.y + 0.7, arena.y - 0.7)
 	if dir.length() > 0.1:
 		_facing = atan2(dir.x, dir.z)
 		_step_timer -= delta
@@ -166,7 +203,8 @@ func _autopilot_direction() -> Vector3:
 			if enemy != null:
 				var to := Vector2(global_position.x - enemy.global_position.x, global_position.z - enemy.global_position.z)
 				d = to.normalized()
-			if p.length() > float(game.get("ARENA")) - 6.0:
+			var arena: Vector2 = game.get("arena")
+			if absf(p.x) > arena.x - 6.0 or absf(p.y) > arena.y - 6.0:
 				d = (d - p.normalized() * 1.5).normalized()
 			return Vector3(d.x, 0, d.y)
 	return Vector3.ZERO
