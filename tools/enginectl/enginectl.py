@@ -581,6 +581,7 @@ SETUP_FILES = [  # что копируется: (откуда относител
     ("game/hero_sprite2d.gd", "game/hero_sprite2d.gd"),
     ("game/enemy2d.gd", "game/enemy2d.gd"),
     ("game/grid.gdshader", "game/grid.gdshader"),
+    ("game/screenshot.gd", "game/screenshot.gd"),
     ("game/gy_game.gd", "game/gy_game.gd"),
     ("game/gy_hero.gd", "game/gy_hero.gd"),
     ("game/gy_enemy.gd", "game/gy_enemy.gd"),
