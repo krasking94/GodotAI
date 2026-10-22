@@ -18,6 +18,8 @@ var xp := 2
 var is_ghost := false
 var is_boss := false
 var is_elite := false
+var is_guard := false  # сторож реликвии: кружит вокруг неё, бьёт на полжизни
+var guard_target: Node3D = null
 var title := ""
 var game: Node = null
 
@@ -34,6 +36,7 @@ var _tint := ""
 var _light_color := ""
 var _windup := 0.0
 var _lunge := 0.0
+var _orbit := 0.0
 
 
 func setup(enemy_kind: String, stats: Dictionary, owner_game: Node) -> void:
@@ -48,6 +51,7 @@ func setup(enemy_kind: String, stats: Dictionary, owner_game: Node) -> void:
 	is_ghost = bool(stats.get("ghost", false))
 	is_boss = bool(stats.get("boss", false))
 	is_elite = bool(stats.get("elite", false))
+	is_guard = bool(stats.get("guard", false))
 	title = str(stats.get("title", enemy_kind))
 	_model_name = str(stats.get("model", enemy_kind))
 	_tint = str(stats.get("tint", ""))
@@ -120,10 +124,21 @@ func _physics_process(delta: float) -> void:
 	var player: Node3D = game.get("player")
 	if player == null:
 		return
-	var to := player.global_position - global_position
+	var target := player.global_position
+	var chasing := true
+	if is_guard and guard_target != null and is_instance_valid(guard_target):
+		var center: Vector3 = guard_target.global_position
+		if player.global_position.distance_to(center) > 7.0:
+			# Герой далеко: кружим вокруг реликвии.
+			_orbit += delta * speed / 2.8
+			target = center + Vector3(cos(_orbit) * 2.8, 0, sin(_orbit) * 2.8)
+			chasing = false
+	var to := target - global_position
 	to.y = 0
 	var dist := to.length()
 	var dir := to / dist if dist > 0.001 else Vector3.ZERO
+	if not chasing and dist < 0.3:
+		dir = Vector3.ZERO
 	velocity.x = dir.x * speed
 	velocity.z = dir.z * speed
 	if _windup > 0.0 or _lunge > 0.0:
@@ -147,7 +162,7 @@ func _physics_process(delta: float) -> void:
 			_lunge = 0.3
 			if dist < reach * 1.25:
 				_strike(player)
-	elif dist < reach and _attack_cooldown <= 0.0:
+	elif chasing and dist < reach and _attack_cooldown <= 0.0:
 		_attack_cooldown = 1.2
 		_windup = 0.28
 		game.play_sound("windup")
@@ -178,9 +193,13 @@ func _physics_process(delta: float) -> void:
 
 ## Удар по герою: урон, искры и звук; герой 0,4 с неуязвим, поэтому толпа не бьёт десять раз за кадр.
 func _strike(player: Node3D) -> void:
-	player.take_damage(damage)
+	if is_guard:
+		player.take_damage(float(player.get("max_hp")) * 0.5)
+		game.spawn_burst(player.global_position + Vector3(0, 0.9, 0), Color("#ff3a3a"), 1.5)
+	else:
+		player.take_damage(damage)
+		game.spawn_burst(player.global_position + Vector3(0, 0.9, 0), Color("#ff6a3a"), 0.5)
 	game.play_sound("punch")
-	game.spawn_burst(player.global_position + Vector3(0, 0.9, 0), Color("#ff6a3a"), 0.5)
 
 
 func take_damage(amount: float) -> void:
