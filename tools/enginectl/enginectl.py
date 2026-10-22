@@ -598,6 +598,7 @@ SETUP_FILES = [  # что копируется: (откуда относител
     ("game/gy_sky.gdshader", "game/gy_sky.gdshader"),
     ("game/gy_ice.gdshader", "game/gy_ice.gdshader"),
     ("tools/enginectl/examples/graveyard.json", "tools/enginectl/examples/graveyard.json"),
+    ("game/actions.gd", "game/actions.gd"),  # карта клавиш: ls_player.gd добавляет действия сам, если в project.godot их нет
     ("game/ls_game.gd", "game/ls_game.gd"),
     ("game/ls_player.gd", "game/ls_player.gd"),
     ("game/ls_hud.gd", "game/ls_hud.gd"),

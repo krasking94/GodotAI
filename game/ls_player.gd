@@ -22,6 +22,7 @@ const FALL_SECONDS := 1.4
 const INTERACT_CRAWL := 1.1
 const INTERACT_WALK := 1.5
 const GOTO_TOLERANCE := 0.3
+const Actions := preload("res://game/actions.gd")  # клавиши W A S D, E, Пробел, Esc — если в project.godot их нет
 
 var game: Node = null  # корень сцены (ls_game.gd)
 var mode := "lie"
@@ -47,6 +48,7 @@ var _step_sound: AudioStreamPlayer
 
 
 func _ready() -> void:
+	Actions.ensure()
 	add_to_group("player")
 	if not DisplayServer.is_touchscreen_available() and not _is_batch():
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
