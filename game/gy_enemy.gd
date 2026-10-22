@@ -28,7 +28,13 @@ var title := ""
 var immune: Array = []  # лужи, которые не замедляют (ice, mud)
 var base_target := Vector3.INF  # нападающий на форпост: идёт не к герою, а к этой точке у забора и бьёт забор
 var frozen := 0.0  # секунды во льду (Ледяной взрыв): стоит, не бьёт
+var special := ""  # приём босса: charge (разбег и таран), summon (зовёт слуг minion), stomp (удар по земле)
+var minion := ""
+var is_bomb := false  # смертник: взрывается у героя
+var is_heavy := false  # громила: почти не отбрасывается
 var game: Node = null
+
+static var _eye_materials := {}
 
 static var _ice_mesh: BoxMesh
 static var _ice_material: StandardMaterial3D
@@ -53,6 +59,13 @@ var _skin := ""
 var _slowed := 0.0
 var _knock := Vector3.ZERO  # отбрасывание (Святая волна, Метеор), гаснет за полсекунды
 var _ice: MeshInstance3D = null
+var _special_timer := 4.0
+var _charge := 0.0  # секунды тарана
+var _charge_dir := Vector3.ZERO
+var _charge_hit := false
+var _dmg_accum := 0.0  # урон, накопленный для одной цифры над головой
+var _dmg_timer := 0.0
+var _eyes := ""
 
 
 func setup(enemy_kind: String, stats: Dictionary, owner_game: Node) -> void:
@@ -74,6 +87,11 @@ func setup(enemy_kind: String, stats: Dictionary, owner_game: Node) -> void:
 	_tint = str(stats.get("tint", ""))
 	_light_color = str(stats.get("light", ""))
 	immune = stats.get("immune", [])
+	special = str(stats.get("special", ""))
+	minion = str(stats.get("minion", ""))
+	is_bomb = bool(stats.get("bomb", false))
+	is_heavy = bool(stats.get("heavy", false))
+	_eyes = str(stats.get("eyes", ""))
 	if is_ghost:
 		immune = ["ice", "mud"]
 	if stats.has("skins"):
@@ -133,6 +151,40 @@ func _ready() -> void:
 		light.omni_range = 4.5
 		light.position = Vector3(0, 0.9 * _size, 0)
 		add_child(light)
+	_add_eyes(box)
+
+
+## Светящиеся глаза: две точки на уровне головы, цвет по виду (eyes в описании, иначе по модели).
+func _add_eyes(box: AABB) -> void:
+	var color := _eyes
+	if color == "":
+		if is_boss and _light_color != "":
+			color = _light_color
+		else:
+			color = {"zombie": "#c8ff40", "skeleton": "#8ad8ff", "ghost": "#ffffff", "vampire": "#ff3030", "character": "#ff9a40"}.get(_model_name, "#ffffff")
+	if not _eye_materials.has(color):
+		var material := StandardMaterial3D.new()
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.albedo_color = Color(color)
+		material.emission_enabled = true
+		material.emission = Color(color)
+		material.emission_energy_multiplier = 2.5
+		_eye_materials[color] = material
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.045 * _size
+	mesh.height = 0.09 * _size
+	mesh.radial_segments = 6
+	mesh.rings = 3
+	var eye_y := (box.end.y - box.size.y * 0.14) if box.size != Vector3.ZERO else 0.8 * _size
+	var eye_z := (box.size.z * 0.42) if box.size != Vector3.ZERO else 0.2 * _size
+	var eye_x := (box.size.x * 0.16) if box.size != Vector3.ZERO else 0.08 * _size
+	for sign in [-1.0, 1.0]:
+		var eye := MeshInstance3D.new()
+		eye.mesh = mesh
+		eye.material_override = _eye_materials[color]
+		eye.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		eye.position = Vector3(sign * eye_x, eye_y, eye_z)
+		add_child(eye)
 
 
 ## Человечек Kenney: одна картинка-скин на все части, подкраска затемняет (одержимые серые).
@@ -204,12 +256,32 @@ func _physics_process(delta: float) -> void:
 	var abilities: Node = game.get("abilities")
 	if abilities != null:
 		factor *= float(abilities.enemy_slow)
+	if base_target == Vector3.INF:
+		factor *= float(game.get("enemy_speed"))
 	_slowed = lerpf(_slowed, 1.0 - factor, 1.0 - exp(-6.0 * delta))
 	velocity.x = dir.x * speed * factor
 	velocity.z = dir.z * speed * factor
 	if _windup > 0.0 or _lunge > 0.0:
 		velocity.x = 0.0  # во время замаха и выпада стоит на месте
 		velocity.z = 0.0
+	if _dmg_timer > 0.0:
+		_dmg_timer -= delta
+		if _dmg_timer <= 0.0:
+			_flush_damage()
+	if is_boss and special != "" and base_target == Vector3.INF and frozen <= 0.0 and _charge <= 0.0:
+		_special_timer -= delta
+		if _special_timer <= 0.0:
+			_use_special(player, dist, dir)
+	if _charge > 0.0:
+		# Таран: несётся по прямой вчетверо быстрее, бьёт героя с полуторным уроном один раз.
+		_charge -= delta
+		velocity.x = _charge_dir.x * speed * 4.0
+		velocity.z = _charge_dir.z * speed * 4.0
+		if not _charge_hit and dist < reach_distance() * 1.4:
+			_charge_hit = true
+			_strike(player, 1.5)
+		if fmod(_charge, 0.06) < delta:
+			game.spawn_burst(global_position + Vector3(0, 0.4, 0), Color(_light_color if _light_color != "" else "#ffffff"), 0.6)
 	if frozen > 0.0:
 		frozen -= delta
 		velocity.x = 0.0
@@ -236,16 +308,16 @@ func _physics_process(delta: float) -> void:
 	if dir != Vector3.ZERO:
 		rotation.y = lerp_angle(rotation.y, atan2(dir.x, dir.z), 1.0 - exp(-8.0 * delta))
 	_attack_cooldown -= delta
-	var reach := 0.55 + 0.35 * _size
+	var reach := reach_distance()
 	if _windup > 0.0:
 		_windup -= delta
 		if _windup <= 0.0:
 			_lunge = 0.3
 			if dist < reach * 1.25:
 				_strike(player)
-	elif chasing and dist < reach and _attack_cooldown <= 0.0 and frozen <= 0.0:
+	elif chasing and dist < reach and _attack_cooldown <= 0.0 and frozen <= 0.0 and _charge <= 0.0:
 		_attack_cooldown = 1.2
-		_windup = 0.28
+		_windup = 0.28 if not is_bomb else 0.45
 		game.play_sound("windup")
 	var forward := 0.0
 	if _windup > 0.0:
@@ -274,19 +346,70 @@ func _physics_process(delta: float) -> void:
 		_model.scale = Vector3.ONE * _model_scale
 
 
+func reach_distance() -> float:
+	return 0.55 + 0.35 * _size
+
+
+## Приём босса: charge — разбег к герою, summon — слуги вокруг, stomp — удар по земле (если герой не дальше 7 м).
+func _use_special(player: Node3D, dist: float, dir: Vector3) -> void:
+	match special:
+		"charge":
+			if dist > 3.0:
+				_charge = 0.9
+				_charge_dir = dir
+				_charge_hit = false
+				_special_timer = 6.0
+				game.play_sound("alert")
+				print("%s идёт на таран" % title)
+			else:
+				_special_timer = 1.0
+		"summon":
+			game.boss_summon(self, minion, 4)
+			_special_timer = 9.0
+		"stomp":
+			if dist <= 7.0:
+				game.boss_stomp(self, 4.5, damage * 1.2)
+				_lunge = 0.3
+				_special_timer = 7.0
+			else:
+				_special_timer = 1.0
+		_:
+			_special_timer = 5.0
+	if player == null:
+		pass
+
+
 ## Удар по герою: урон, искры и звук; герой 0,4 с неуязвим, поэтому толпа не бьёт десять раз за кадр.
-## Нападающий на форпост бьёт по забору: только искры, без урона.
-func _strike(player: Node3D) -> void:
+## Нападающий на форпост бьёт по забору: только искры, без урона. Смертник взрывается: урон всем в 2,5 м и сам гибнет.
+func _strike(player: Node3D, mult: float = 1.0) -> void:
 	if base_target != Vector3.INF:
 		game.spawn_burst(global_position + Vector3(0, 0.7, 0) + (base_target - global_position).normalized() * 0.5, Color("#c8b08a"), 0.4)
+		return
+	if is_bomb:
+		if player.global_position.distance_to(global_position) <= 2.5:
+			player.take_damage(damage)
+		game.spawn_burst(global_position + Vector3(0, 0.6, 0), Color("#c050ff"), 2.5)
+		game.play_sound("die_elite")
+		game.shake(0.35)
+		hp = 0.0
+		game.on_enemy_died(self)
+		queue_free()
 		return
 	if is_guard:
 		player.take_damage(float(player.get("max_hp")) * 0.5)
 		game.spawn_burst(player.global_position + Vector3(0, 0.9, 0), Color("#ff3a3a"), 1.5)
 	else:
-		player.take_damage(damage)
-		game.spawn_burst(player.global_position + Vector3(0, 0.9, 0), Color("#ff6a3a"), 0.5)
+		player.take_damage(damage * mult)
+		game.spawn_burst(player.global_position + Vector3(0, 0.9, 0), Color("#ff6a3a"), 0.5 * mult)
 	game.play_sound("punch")
+
+
+## Показать накопленный урон одной цифрой над головой.
+func _flush_damage() -> void:
+	if _dmg_accum > 0.0:
+		game.show_damage(global_position + Vector3(0, 0.9 * _size + 0.3, 0), _dmg_accum, is_boss)
+	_dmg_accum = 0.0
+	_dmg_timer = 0.0
 
 
 func take_damage(amount: float) -> void:
@@ -294,15 +417,19 @@ func take_damage(amount: float) -> void:
 		return
 	hp -= amount
 	_hit = 0.12
+	_dmg_accum += amount
+	if _dmg_timer <= 0.0:
+		_dmg_timer = 0.15
 	game.play_sound("hit")
 	if hp <= 0.0:
+		_flush_damage()
 		game.on_enemy_died(self)
 		queue_free()
 
 
 ## Отбросить: толчок в метрах в секунду, гаснет сам. Боссов отбрасывает втрое слабее.
 func knockback(push: Vector3) -> void:
-	_knock += push * (0.3 if is_boss else 1.0)
+	_knock += push * (0.3 if is_boss or is_heavy else 1.0)
 
 
 ## Вморозить в лёд на seconds: стоит на месте, не бьёт, вокруг полупрозрачный ледяной куб.

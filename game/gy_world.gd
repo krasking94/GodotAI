@@ -411,6 +411,33 @@ func _build_lights() -> void:
 			place_light("lightpostSingle", pos, 1.6, Color("#ffe0a0"), energy * 1.5, false)
 
 
+## Кровавая минута: небо и свет краснеют (и обратно). Обычные цвета запоминаются при первом включении.
+var _normal_env: Dictionary = {}
+
+func set_blood(on: bool) -> void:
+	if environment == null:
+		return
+	var sky_material: ShaderMaterial = environment.sky.sky_material
+	if _normal_env.is_empty():
+		_normal_env = {"ambient": environment.ambient_light_color, "fog": environment.fog_light_color,
+			"moon_light": moon.light_color, "moon": sky_material.get_shader_parameter("moon_color"),
+			"haze": sky_material.get_shader_parameter("haze_color"), "horizon": sky_material.get_shader_parameter("horizon_color")}
+	if on:
+		environment.ambient_light_color = Color("#4a1414")
+		environment.fog_light_color = Color("#2a0808")
+		moon.light_color = Color("#e05848")
+		sky_material.set_shader_parameter("moon_color", Color("#ff3030"))
+		sky_material.set_shader_parameter("haze_color", Color("#5a0a0a"))
+		sky_material.set_shader_parameter("horizon_color", Color("#4a0c10"))
+	else:
+		environment.ambient_light_color = _normal_env["ambient"]
+		environment.fog_light_color = _normal_env["fog"]
+		moon.light_color = _normal_env["moon_light"]
+		sky_material.set_shader_parameter("moon_color", _normal_env["moon"])
+		sky_material.set_shader_parameter("haze_color", _normal_env["haze"])
+		sky_material.set_shader_parameter("horizon_color", _normal_env["horizon"])
+
+
 func tick(_delta: float) -> void:
 	var t := Time.get_ticks_msec()
 	for fire in fires:

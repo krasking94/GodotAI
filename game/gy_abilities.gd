@@ -154,6 +154,11 @@ func _densest_spot(origin: Vector3, reach: float) -> Vector3:
 	return best
 
 
+## Кольцо света, расходящееся от center до radius за полсекунды (и для приёмов боссов из gy_game.gd).
+func ring(center: Vector3, color: Color, radius: float) -> void:
+	_ring(center, color, radius)
+
+
 func _ring(center: Vector3, color: Color, radius: float) -> void:
 	if _ring_material == null:
 		_ring_material = StandardMaterial3D.new()

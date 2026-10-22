@@ -15,7 +15,7 @@ extends Node3D
 ## Самопроверка для ИИ: --test-graveyard=seconds:30,auto:1,move:circle,seed:1,report:5,map:winter,quit:1
 ## pick:N — в открытом окне выбрать строку N (вместе с shop); at:x:z — поставить героя в форпосте в точку;
 ## slots:nova.dash.frost.meteor — какие способности в слотах на эту ночь; cast:id:сек — включить способность
-## id на этой секунде (можно несколько через «;»); abilities:all — открыть все способности.
+## id на этой секунде (можно несколько через «;»); abilities:all — открыть все способности; god:1 — герой бессмертен.
 ## seconds — длина раунда; auto — без меню и с автоматическим выбором прокачки; move — автопилот героя
 ## (circle кружит вокруг центра, away убегает от ближайшего врага, relic бежит к реликвии, none стоит);
 ## boss:секунда — когда выходит босс; rate — множитель частоты появления врагов; skin — имя скина;
@@ -51,16 +51,21 @@ const ENEMY_KINDS := {
 	"villager": {"model": "character", "skins": ["man", "woman", "manAlternative", "womanAlternative"], "tint": "#8a9098", "title": "Одержимый", "hp": 18.0, "speed": 3.3, "damage": 7.0, "xp": 2, "scale": 1.7, "model_scale": 0.105},
 	"burning": {"model": "zombie", "title": "Горящий", "tint": "#ff8a2a", "hp": 35.0, "speed": 2.6, "damage": 12.0, "xp": 4, "scale": 1.8, "light": "#ff6a1a"},
 	"guard": {"model": "skeleton", "title": "Сторож", "tint": "#ff6a4a", "hp": 40.0, "speed": 5.5, "damage": 0.0, "xp": 12, "scale": 1.7, "guard": true, "light": "#ff4a2a"},
-	# Боссы: по одному на карту, выходят на 80 % раунда.
-	"vampire": {"model": "vampire", "title": "Вампир", "hp": 700.0, "speed": 2.4, "damage": 25.0, "xp": 60, "scale": 3.2, "boss": true, "light": "#ff3a3a"},
-	"bog_king": {"model": "zombie", "title": "Болотный царь", "tint": "#4a7a2a", "hp": 900.0, "speed": 1.9, "damage": 28.0, "xp": 70, "scale": 3.4, "boss": true, "light": "#7aff3a", "immune": ["mud"]},
-	"frost_giant": {"model": "zombie", "title": "Ледяной великан", "tint": "#bfe8ff", "hp": 1000.0, "speed": 2.0, "damage": 30.0, "xp": 70, "scale": 3.6, "boss": true, "light": "#a0e0ff", "immune": ["ice"]},
-	"elder": {"model": "character", "skins": ["orc"], "title": "Староста", "hp": 900.0, "speed": 3.0, "damage": 25.0, "xp": 70, "scale": 3.0, "model_scale": 0.19, "boss": true, "light": "#ffb060"},
-	"ghost_lord": {"model": "ghost", "title": "Владыка призраков", "tint": "#c0a0ff", "hp": 1000.0, "speed": 2.8, "damage": 25.0, "xp": 80, "scale": 3.4, "ghost": true, "boss": true, "light": "#b080ff"},
-	"pumpkin_king": {"model": "vampire", "title": "Тыквенный король", "tint": "#ff9a30", "hp": 1100.0, "speed": 2.4, "damage": 28.0, "xp": 80, "scale": 3.3, "boss": true, "light": "#ff8a20"},
-	"butcher": {"model": "zombie", "title": "Мясник", "tint": "#8a2a2a", "hp": 1300.0, "speed": 2.6, "damage": 35.0, "xp": 90, "scale": 3.6, "boss": true, "light": "#ff3030"},
-	"lich": {"model": "skeleton", "title": "Король-лич", "tint": "#d8f0ff", "hp": 1300.0, "speed": 2.4, "damage": 30.0, "xp": 100, "scale": 3.4, "boss": true, "light": "#80d0ff"},
-	"prince": {"model": "vampire", "title": "Князь вампиров", "hp": 2500.0, "speed": 2.6, "damage": 35.0, "xp": 200, "scale": 3.6, "boss": true, "light": "#ff2a4a"},
+	# Новые твари этапа 4: гончая (быстрая и хлипкая), смертник (взрывается у героя), громила (толстый, не отбросить).
+	"hound": {"model": "zombie", "title": "Гончая", "tint": "#8a6a4a", "hp": 16.0, "speed": 4.2, "damage": 6.0, "xp": 2, "scale": 1.2, "eyes": "#ffd040"},
+	"bomber": {"model": "zombie", "title": "Смертник", "tint": "#c050ff", "hp": 25.0, "speed": 3.0, "damage": 24.0, "xp": 4, "scale": 1.6, "bomb": true, "light": "#c050ff", "eyes": "#ff60ff"},
+	"brute": {"model": "zombie", "title": "Громила", "tint": "#5a4a3a", "hp": 220.0, "speed": 1.1, "damage": 24.0, "xp": 14, "scale": 2.8, "elite": true, "heavy": true, "eyes": "#ff4040"},
+	# Боссы: по одному на карту, выходят на 80 % раунда. special — приём: charge (разбег и таран), summon (зовёт
+	# слуг minion), stomp (удар по земле: волна вокруг себя).
+	"vampire": {"model": "vampire", "title": "Вампир", "hp": 700.0, "speed": 2.4, "damage": 25.0, "xp": 60, "scale": 3.2, "boss": true, "light": "#ff3a3a", "special": "charge"},
+	"bog_king": {"model": "zombie", "title": "Болотный царь", "tint": "#4a7a2a", "hp": 900.0, "speed": 1.9, "damage": 28.0, "xp": 70, "scale": 3.4, "boss": true, "light": "#7aff3a", "immune": ["mud"], "special": "summon", "minion": "bog"},
+	"frost_giant": {"model": "zombie", "title": "Ледяной великан", "tint": "#bfe8ff", "hp": 1000.0, "speed": 2.0, "damage": 30.0, "xp": 70, "scale": 3.6, "boss": true, "light": "#a0e0ff", "immune": ["ice"], "special": "stomp"},
+	"elder": {"model": "character", "skins": ["orc"], "title": "Староста", "hp": 900.0, "speed": 3.0, "damage": 25.0, "xp": 70, "scale": 3.0, "model_scale": 0.19, "boss": true, "light": "#ffb060", "special": "summon", "minion": "villager"},
+	"ghost_lord": {"model": "ghost", "title": "Владыка призраков", "tint": "#c0a0ff", "hp": 1000.0, "speed": 2.8, "damage": 25.0, "xp": 80, "scale": 3.4, "ghost": true, "boss": true, "light": "#b080ff", "special": "summon", "minion": "ghost"},
+	"pumpkin_king": {"model": "vampire", "title": "Тыквенный король", "tint": "#ff9a30", "hp": 1100.0, "speed": 2.4, "damage": 28.0, "xp": 80, "scale": 3.3, "boss": true, "light": "#ff8a20", "special": "stomp"},
+	"butcher": {"model": "zombie", "title": "Мясник", "tint": "#8a2a2a", "hp": 1300.0, "speed": 2.6, "damage": 35.0, "xp": 90, "scale": 3.6, "boss": true, "light": "#ff3030", "special": "charge"},
+	"lich": {"model": "skeleton", "title": "Король-лич", "tint": "#d8f0ff", "hp": 1300.0, "speed": 2.4, "damage": 30.0, "xp": 100, "scale": 3.4, "boss": true, "light": "#80d0ff", "special": "summon", "minion": "skeleton"},
+	"prince": {"model": "vampire", "title": "Князь вампиров", "hp": 2500.0, "speed": 2.6, "damage": 35.0, "xp": 200, "scale": 3.6, "boss": true, "light": "#ff2a4a", "special": "charge"},
 }
 const UPGRADES := [
 	{"id": "damage", "title": "Сила удара", "text": "Урон снарядов +30%"},
@@ -91,6 +96,13 @@ const RELIC_COLOR := Color("#c070ff")
 const SPAWN_MIN := 17.0
 const SPAWN_MAX := 22.0
 const MAX_ENEMIES := 90
+const WAVE_EVERY := 30.0  # волна каждые 30 с: толпа с одной стороны и объявление на табло
+const BLOOD_AT := 0.45  # кровавая минута начинается на этой доле раунда
+const BLOOD_LENGTH := 45.0
+const LAST_STAND := 20.0  # последние секунды раунда: враги валят вдвое гуще
+const COMBO_WINDOW := 2.0  # серия: убийства не реже чем раз в 2 с
+const COMBO_BONUS := {10: 5, 25: 15, 50: 40, 100: 100}  # серия → души сверху
+const SIDES := [["с севера", Vector3(0, 0, -1)], ["с юга", Vector3(0, 0, 1)], ["с востока", Vector3(1, 0, 0)], ["с запада", Vector3(-1, 0, 0)]]
 const SOUL_LIFETIME := 40.0
 const Enemy := preload("res://game/gy_enemy.gd")
 const Maps := preload("res://game/gy_maps.gd")
@@ -166,6 +178,18 @@ var _end_timer := 0.0
 var _shop_timer := 0.0
 var _shake := 0.0
 var _casts: Array = []  # самопроверка: [id, секунда] — включить способность на этой секунде
+var wave := 0  # номер волны
+var blood := false  # кровавая минута: враги быстрее, опыт вдвое, небо красное
+var last_stand := false  # последний рубеж
+var enemy_speed := 1.0  # множитель скорости всех врагов (кровавая минута)
+var combo := 0  # серия убийств подряд
+var combo_souls := 0  # души за серии сверх обычных
+var _wave_timer := WAVE_EVERY
+var _blood_done := false
+var _blood_left := 0.0
+var _combo_timer := 0.0
+var _numbers: Array = []  # цифры урона: [Label3D, возраст]
+var _numbers_root: Node3D
 
 
 func _ready() -> void:
@@ -433,6 +457,14 @@ func _process(delta: float) -> void:
 			abilities.cast(str(cast[0]))
 	if hud != null:
 		hud.set_cooldowns(abilities)
+	_update_waves(delta)
+	_update_numbers(delta)
+	if _combo_timer > 0.0:
+		_combo_timer -= delta
+		if _combo_timer <= 0.0:
+			combo = 0
+			if hud != null:
+				hud.set_combo(0, 0.0)
 	_spawn(delta)
 	_update_souls(delta)
 	_update_relic(delta)
@@ -480,8 +512,127 @@ func cast_slot(index: int) -> void:
 		play_sound("hover")
 
 
+## Волны каждые 30 с (толпа с одной стороны), кровавая минута на 45 % раунда, последний рубеж за 20 с до конца.
+func _update_waves(delta: float) -> void:
+	_wave_timer -= delta
+	if _wave_timer <= 0.0:
+		_wave_timer = WAVE_EVERY
+		wave += 1
+		var side: Array = SIDES[_rng.randi_range(0, SIDES.size() - 1)]
+		var dir: Vector3 = side[1]
+		var count := mini(4 + 2 * wave, 20)
+		var spawned := 0
+		for i in count:
+			if enemies.size() >= MAX_ENEMIES:
+				break
+			var spread := Vector3(-dir.z, 0, dir.x) * _rng.randf_range(-7.0, 7.0)
+			var pos := player.global_position + dir * _rng.randf_range(SPAWN_MIN, SPAWN_MAX) + spread
+			_spawn_enemy(_pick_kind(), pos)
+			spawned += 1
+		play_sound("alert")
+		shake(0.25)
+		if hud != null:
+			hud.show_banner("Волна %d — %s!" % [wave, str(side[0])], "#ff8a5a")
+		print("Волна %d на %d с: %d тварей %s" % [wave, int(elapsed), spawned, str(side[0])])
+	if not _blood_done and elapsed >= round_seconds * BLOOD_AT:
+		_blood_done = true
+		blood = true
+		_blood_left = BLOOD_LENGTH
+		enemy_speed = 1.3
+		world.set_blood(true)
+		play_sound("alert")
+		shake(0.4)
+		if hud != null:
+			hud.show_banner("Кровавая минута: враги быстрее, опыт вдвое!", "#ff4a4a")
+		print("Кровавая минута началась на %d с" % int(elapsed))
+	if blood:
+		_blood_left -= delta
+		if _blood_left <= 0.0:
+			blood = false
+			enemy_speed = 1.0
+			world.set_blood(false)
+			if hud != null:
+				hud.show_banner("Кровавая минута прошла", "#ffb347")
+			print("Кровавая минута прошла на %d с" % int(elapsed))
+	if not last_stand and elapsed >= round_seconds - LAST_STAND and round_seconds > LAST_STAND * 2.0:
+		last_stand = true
+		play_sound("alert")
+		shake(0.3)
+		if hud != null:
+			hud.show_banner("Последний рубеж: продержись %d секунд!" % int(LAST_STAND), "#ffe08a")
+		print("Последний рубеж на %d с" % int(elapsed))
+
+
+## Цифра урона над врагом: всплывает и тает за 0,7 с. Больших цифр (боссы, метеор) — крупнее и оранжевее.
+func show_damage(pos: Vector3, amount: float, big: bool) -> void:
+	if str(test_options.get("fx", "1")) == "0":
+		return
+	if _numbers_root == null:
+		_numbers_root = _make_root("Numbers")
+	while _numbers.size() >= 48:
+		var old: Array = _numbers.pop_front()
+		old[0].queue_free()
+	var label := Label3D.new()
+	label.text = str(int(ceil(amount)))
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	label.font_size = 64 if big or amount >= 50.0 else 44
+	label.pixel_size = 0.012
+	label.outline_size = 14
+	label.modulate = Color("#ff9a3a") if big or amount >= 50.0 else Color("#fff0c0")
+	label.outline_modulate = Color(0, 0, 0, 0.9)
+	_numbers_root.add_child(label)
+	label.global_position = pos + Vector3(_rng.randf_range(-0.3, 0.3), 0.3, 0)
+	_numbers.append([label, 0.0])
+
+
+func _update_numbers(delta: float) -> void:
+	for item in _numbers.duplicate():
+		var label: Label3D = item[0]
+		item[1] += delta
+		var k: float = item[1] / 0.7
+		if k >= 1.0:
+			_numbers.erase(item)
+			label.queue_free()
+			continue
+		label.global_position.y += delta * 1.4
+		label.modulate.a = 1.0 - k * k
+		label.outline_modulate.a = 0.9 * (1.0 - k * k)
+
+
+## Босс зовёт слуг: count тварей вида kind вокруг него.
+func boss_summon(boss: Node3D, kind: String, count: int) -> void:
+	if not ENEMY_KINDS.has(kind):
+		return
+	for i in count:
+		if enemies.size() >= MAX_ENEMIES:
+			break
+		var angle := TAU * i / count
+		var minion := _spawn_enemy(kind, boss.global_position + Vector3(cos(angle) * 2.5, 0, sin(angle) * 2.5))
+		spawn_burst(minion.global_position + Vector3(0, 0.6, 0), Color(str(ENEMY_KINDS[boss.kind].get("light", "#ffffff"))), 0.8)
+	play_sound("elite")
+	if hud != null:
+		hud.show_banner("%s зовёт слуг!" % boss.title, "#c080ff")
+	print("%s позвал %d слуг (%s) на %d с" % [boss.title, count, kind, int(elapsed)])
+
+
+## Босс бьёт по земле: кольцо, тряска, урон герою в radius.
+func boss_stomp(boss: Node3D, radius: float, damage: float) -> void:
+	abilities.ring(boss.global_position, Color(str(ENEMY_KINDS[boss.kind].get("light", "#ffffff"))), radius)
+	spawn_burst(boss.global_position + Vector3(0, 0.3, 0), Color("#c8b08a"), 2.0)
+	shake(0.55)
+	play_sound("die_elite")
+	if player.global_position.distance_to(boss.global_position) <= radius:
+		player.take_damage(damage)
+	print("%s ударил по земле на %d с" % [boss.title, int(elapsed)])
+
+
 func _spawn(delta: float) -> void:
 	var rate := (0.7 + elapsed / 35.0) * float(map["rate"]) * float(test_options.get("rate", 1.0))
+	if blood:
+		rate *= 1.5
+	if last_stand:
+		rate *= 2.0
 	_spawn_budget += rate * delta
 	while _spawn_budget >= 1.0:
 		_spawn_budget -= 1.0
@@ -491,8 +642,9 @@ func _spawn(delta: float) -> void:
 		boss_spawned = true
 		var boss := _spawn_enemy(str(map["boss"]))
 		play_sound("boss")
+		shake(0.5)
 		if hud != null:
-			hud.show_banner("%s вышел из тьмы!" % boss.title)
+			hud.show_banner("%s вышел из тьмы!" % boss.title, "#ff4a4a")
 		print("Босс %s вышел на %d с" % [boss.title, int(elapsed)])
 
 
@@ -549,11 +701,22 @@ func on_enemy_died(enemy: Node3D) -> void:
 		play_sound("die_" + str(stats.get("model", "zombie")))  # нападающий на форпост: без душ и счёта
 		return
 	kills += 1
-	_spawn_soul(pos, ceili(float(enemy.xp) * float(map["xp_mult"])), "soul")
+	_spawn_soul(pos, ceili(float(enemy.xp) * float(map["xp_mult"]) * (2.0 if blood else 1.0)), "soul")
+	combo += 1
+	_combo_timer = COMBO_WINDOW
+	if COMBO_BONUS.has(combo):
+		combo_souls += int(COMBO_BONUS[combo])
+		play_sound("select")
+		if hud != null:
+			hud.show_banner("Серия %d! ✦ +%d" % [combo, int(COMBO_BONUS[combo])], "#ffe08a")
+		print("Серия %d на %d с" % [combo, int(elapsed)])
+	if hud != null:
+		hud.set_combo(combo, 1.0)
 	if enemy.is_boss:
 		boss_killed = true
 		_spawn_soul(pos + Vector3(1, 0, 0), 0, "pumpkin")
 		play_sound("boss")
+		shake(0.8)
 		if hud != null:
 			hud.show_banner("%s повержен!" % enemy.title)
 		print("Босс %s повержен на %d с" % [enemy.title, int(elapsed)])
@@ -829,7 +992,7 @@ func score() -> int:
 ## Души за ночь: по одной за убитого, по пять за уровень, 40 за босса, за победу 80 плюс 30 за номер карты;
 ## Жатва на алтаре добавляет по 10 % за уровень.
 func souls_for_night(won: bool) -> int:
-	var amount := kills + (level - 1) * 5 + (40 if boss_killed else 0)
+	var amount := kills + (level - 1) * 5 + (40 if boss_killed else 0) + combo_souls
 	if won:
 		amount += 80 + 30 * Maps.index_of(map_id)
 	return ceili(float(amount) * (1.0 + 0.1 * Save.upgrade_level("harvest")))
@@ -864,8 +1027,9 @@ func game_over() -> void:
 
 
 func _report(label: String) -> void:
-	print("Кладбище %s: карта %s, здоровье %d/%d, уровень %d (опыт %d/%d), врагов %d, убито %d, душ на земле %d, счёт %d" % [label,
-		map_id, int(player.hp), int(player.max_hp), level, xp, xp_needed, enemies.size(), kills, souls.size(), score()])
+	print("Кладбище %s: карта %s, здоровье %d/%d, уровень %d (опыт %d/%d), врагов %d, убито %d, душ на земле %d, счёт %d, волна %d%s" % [label,
+		map_id, int(player.hp), int(player.max_hp), level, xp, xp_needed, enemies.size(), kills, souls.size(), score(), wave,
+		(", кровавая минута" if blood else "") + (", последний рубеж" if last_stand else "")])
 
 
 ## R после конца: та же карта заново, сразу в бой.
