@@ -587,6 +587,7 @@ SETUP_FILES = [  # что копируется: (откуда относител
     ("game/gy_enemy.gd", "game/gy_enemy.gd"),
     ("game/gy_bolt.gd", "game/gy_bolt.gd"),
     ("game/gy_hud.gd", "game/gy_hud.gd"),
+    ("game/gy_ground.gdshader", "game/gy_ground.gdshader"),
     ("tools/enginectl/examples/graveyard.json", "tools/enginectl/examples/graveyard.json"),
 ]
 SETUP_DIRS = ["assets/kenney/platformer", "assets/kenney/graveyard", "assets/kenney/characters"]  # папки копируются целиком (кроме *.import, их создаст Godot)
