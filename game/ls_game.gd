@@ -11,8 +11,10 @@ extends Node3D
 ## открывается, когда Ноги ≥ LEGS_TO_STAND: чем больше ползаешь, тем раньше встанешь. Отношения с мамой
 ## и папой (relations) растут за выполненные просьбы и влияют на прибавку Речи и Сердца.
 ## Лампочка (H) показывает, что делать, куда идти (комната и направление) и клавиши. Предисловие — в начале.
-## Итог этапа пишется в user://lifesim_save.json (навыки, отношения, пройденный этап) — задел для
-## «начать новую игру с садика». Экран — ls_hud.gd.
+## Прогресс пишется в user://lifesim_save.json после каждого задания («Продолжить» в главном меню),
+## настройки — в user://lifesim_settings.json. Экран, меню, пауза и настройки — ls_hud.gd.
+## Звук: шаги и шорохи ползания, предметы, награды, клики меню (Kenney, CC0), колыбельная, двор за окном,
+## лепет и смех малыша (сделаны кодом, assets/lifesim/audio). Музыка — шина Music, остальное — SFX.
 ##
 ## Самопроверка для ИИ: --test-lifesim=auto:1,seconds:120,report:5,quit:1
 ## auto — автопилот: закрывает предисловие, ходит к целям, нажимает E, в мини-играх отвечает верно;
@@ -25,22 +27,16 @@ const FOOD := "res://assets/kenney/food/"
 const CHARACTER := "res://assets/kenney/characters/basicCharacter.gltf"
 const SKIN_DIR := "res://assets/kenney/characters/skins/"
 const SOUNDS := "res://assets/kenney/graveyard/sounds/"
+const AUDIO := "res://assets/lifesim/audio/"
+const VERSION := "0.2 — младенчество"
+const SETTINGS_PATH := "user://lifesim_settings.json"
 const FURNITURE_SCALE := 2.0   # мебель Kenney: холодильник 0,92 → 1,84 м
 const FOOD_SCALE := 0.45       # еда Kenney: яблоко 0,2 → 0,09 м
-const WALL_H := 2.7
-const WALL_T := 0.16
+const World := preload("res://game/ls_world.gd")
 const LEGS_TO_STAND := 18.0    # навык «Ноги», с которого малыш может встать
 const MONTH_SECONDS := 25.0    # пассивный ход времени: месяц за столько секунд
 const STAGE_END_MONTHS := 36
 const SAVE_PATH := "user://lifesim_save.json"
-
-const ROOMS := {
-	"nursery": {"title": "детская", "rect": Rect2(0, 0, 4, 4.5), "floor": "#e8c9a0"},
-	"living": {"title": "гостиная", "rect": Rect2(4, 0, 4.5, 9), "floor": "#d9a86c"},
-	"kitchen": {"title": "кухня", "rect": Rect2(8.5, 0, 3.5, 4.5), "floor": "#cfe3ea"},
-	"bath": {"title": "ванная", "rect": Rect2(0, 4.5, 4, 4.5), "floor": "#dfe9f0"},
-	"bedroom": {"title": "спальня", "rect": Rect2(8.5, 4.5, 3.5, 4.5), "floor": "#d9b4c8"},
-}
 
 ## Цепочка заданий. type: look (смотреть на цель), interact (нажать E у цели), reach (подойти к цели),
 ## stand (встать на ножки), fetch (взять предмет и отдать получателю), collect (несколько предметов в коробку),
@@ -85,11 +81,6 @@ const QUESTS := [
 		"say": "Пора спать, малыш. Сладких снов!"},
 ]
 
-## Дверные проёмы (центр проёма в плане) и центры комнат — для маршрута автопилота и подсказок.
-const DOORS := {"nursery": Vector3(4.0, 0, 2.4), "kitchen": Vector3(8.5, 0, 2.4), "bath": Vector3(4.0, 0, 6.8), "bedroom": Vector3(8.5, 0, 6.8)}
-const ROOM_CENTER := {"nursery": Vector3(2.0, 0, 2.25), "kitchen": Vector3(10.25, 0, 2.25), "bath": Vector3(2.0, 0, 6.75),
-	"bedroom": Vector3(10.25, 0, 6.75), "living": Vector3(6.25, 0, 4.5)}
-
 const DICTIONARY := {"word": "МАМА", "letters": ["А", "Б", "В", "Г", "Д", "М", "О", "П"]}
 
 var skills := {"legs": 0.0, "hands": 0.0, "speech": 0.0, "mind": 0.0, "heart": 0.0}
@@ -100,6 +91,7 @@ var stage_done := false
 var _month_time := 0.0
 var _look_time := 0.0
 var _collected := 0
+var world: Node3D  # ls_world.gd: дом, двор, свет
 var _player: CharacterBody3D
 var _hud: CanvasLayer
 var _props := {}          # имя -> узел (мебель, предметы, родители)
@@ -115,6 +107,14 @@ var _auto_wait := 0.0
 var _auto_path: Array = []
 var _auto_goal := Vector3.ZERO
 var _mom_mood_time := 0.0
+var settings := {"sensitivity": 1.0, "music": 0.6, "sfx": 0.9, "invert_y": false, "head_bob": true, "fullscreen": false}
+var _music: AudioStreamPlayer
+var _ambient: AudioStreamPlayer
+var _sfx_bus := 0
+var _music_bus := 0
+var _nothing_time := 0.0
+var _started := false   # игра началась (меню закрыто)
+var _from_save := false  # «Продолжить»: навыки уже загружены, награды заново не выдаём
 
 @onready var _player_node: CharacterBody3D = $Player
 @onready var _hud_node: CanvasLayer = $Hud
@@ -130,32 +130,155 @@ func _ready() -> void:
 	_hud.minigame_finished.connect(_on_minigame)
 	_hud.intro_closed.connect(_on_intro_closed)
 	_hud.lamp_toggled.connect(func(open: bool) -> void: if open: _update_lamp())
+	_hud.menu_action.connect(_on_menu_action)
+	_hud.settings_changed.connect(_on_settings_changed)
+	_hud.sound_requested.connect(play_sound)
+	_hud.set_version("версия %s" % VERSION)
+	_setup_audio()
 	_load_sounds()
-	_build_environment()
-	_build_house()
+	_load_settings()
+	world = World.new()
+	add_child(world)
+	world.build()
 	_build_furniture()
 	_build_parents()
 	_build_marker()
 	_player.teleport(_props["Crib"].global_position + Vector3(0, 0.55, 0), PI)
 	_player.set_mode("lie")
 	_player.legs = skills["legs"]
+	_hud.auto_pick = _test.get("auto", "0") == "1"
+	_refresh_hud()
+	print("Жизнь: дом построен, мебели %d, заданий %d, малыш в кроватке" % [_props.size(), QUESTS.size()])
+	if _test.is_empty() or _test.get("menu", "0") == "1":
+		_hud.show_main_menu(_has_progress())
+		_play_music()
+		return
+	_begin_game(_test.get("intro", "1") == "1" and _test.get("auto", "0") != "1")
+
+
+## Старт игры (новая или продолжение): задание, предисловие, реплика мамы.
+func _begin_game(with_intro: bool) -> void:
+	_started = true
+	_hud.hide_main_menu()
 	if _test.has("quest"):
 		_jump_to_quest(int(_test["quest"]))
+		_test.erase("quest")
 	if _test.has("look"):
 		var parts: PackedStringArray = str(_test["look"]).split(":")
 		if parts.size() >= 2:
 			var to := Vector3(float(parts[0]), 0.0, float(parts[1])) - _player.global_position
 			_player.rotation.y = atan2(-to.x, -to.z)
-	_hud.auto_pick = _test.get("auto", "0") == "1"
-	_refresh_hud()
 	_start_quest()
-	if _test.get("intro", "1") == "1" and _test.get("auto", "0") != "1":
+	_play_music()
+	if with_intro:
 		_hud.show_intro()
 	else:
 		_on_intro_closed()
 	if _test.get("lamp", "0") == "1":
 		_hud.toggle_lamp()
-	print("Жизнь: дом построен, мебели %d, заданий %d, малыш в кроватке" % [_props.size(), QUESTS.size()])
+	if _test.get("pause", "0") == "1":  # для снимков: окно паузы или настроек
+		_set_paused(true)
+	elif _test.get("settings", "0") == "1":
+		_hud._show_settings("menu")
+
+
+# --- Меню, пауза, настройки ------------------------------------------------------------------
+
+func _on_menu_action(id: String) -> void:
+	match id:
+		"new_game":
+			_reset_progress()
+			_begin_game(true)
+		"continue":
+			if _load_progress():
+				_begin_game(false)
+			else:
+				_reset_progress()
+				_begin_game(true)
+		"resume":
+			_set_paused(false)
+		"main_menu":
+			_set_paused(false)
+			if _started and not stage_done:
+				_save_progress()
+			_started = false
+			_hud.show_main_menu(_has_progress())
+		"exit":
+			if _started and not stage_done:
+				_save_progress()
+			get_tree().quit(0)
+
+
+## Esc: закрыть открытое окно или поставить игру на паузу.
+func toggle_pause() -> void:
+	if _hud.handle_escape():
+		play_sound("click")
+		return
+	if _hud.main_menu_open() or not _started or _hud.ui_open:
+		return
+	play_sound("click")
+	_set_paused(true)
+
+
+func _set_paused(on: bool) -> void:
+	get_tree().paused = on
+	if on:
+		_hud.show_pause()
+	else:
+		_hud.hide_pause()
+
+
+func toggle_lamp() -> void:
+	play_sound("click")
+	_hud.toggle_lamp()
+
+
+func toggle_fullscreen() -> void:
+	settings["fullscreen"] = not bool(settings.get("fullscreen", false))
+	_hud.apply_settings(settings)
+	_apply_settings()
+	_save_settings()
+
+
+func _on_settings_changed(new_settings: Dictionary) -> void:
+	for key in new_settings:
+		settings[key] = new_settings[key]
+	_apply_settings()
+	_save_settings()
+
+
+func _apply_settings() -> void:
+	_player.set_settings(settings)
+	AudioServer.set_bus_volume_db(_music_bus, linear_to_db(clampf(float(settings.get("music", 0.6)), 0.0, 1.0)))
+	AudioServer.set_bus_volume_db(_sfx_bus, linear_to_db(clampf(float(settings.get("sfx", 0.9)), 0.0, 1.0)))
+	AudioServer.set_bus_mute(_music_bus, float(settings.get("music", 0.6)) <= 0.001)
+	AudioServer.set_bus_mute(_sfx_bus, float(settings.get("sfx", 0.9)) <= 0.001)
+	if DisplayServer.get_name() != "headless":
+		var want_full: bool = bool(settings.get("fullscreen", false))
+		var is_full: bool = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+		if want_full != is_full:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if want_full else DisplayServer.WINDOW_MODE_WINDOWED)
+
+
+func _load_settings() -> void:
+	if FileAccess.file_exists(SETTINGS_PATH):
+		var file := FileAccess.open(SETTINGS_PATH, FileAccess.READ)
+		if file != null:
+			var data: Variant = JSON.parse_string(file.get_as_text())
+			file.close()
+			if data is Dictionary:
+				for key in settings:
+					if (data as Dictionary).has(key):
+						settings[key] = data[key]
+	_hud.apply_settings(settings)
+	_apply_settings()
+
+
+func _save_settings() -> void:
+	var file := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
+	if file != null:
+		file.store_string(JSON.stringify(settings, "  "))
+		file.close()
 
 
 func _parse_test() -> void:
@@ -174,229 +297,31 @@ func ui_blocks_mouse() -> bool:
 	return _hud.ui_open
 
 
-# --- Мир --------------------------------------------------------------------------------
-
-func _build_environment() -> void:
-	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("#9fd4ff")
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("#fff1dc")
-	env.ambient_light_energy = 0.5
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 0.95
-	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.12
-	var world_env := WorldEnvironment.new()
-	world_env.environment = env
-	add_child(world_env)
-	var sun := DirectionalLight3D.new()
-	sun.light_color = Color("#fff4e0")
-	sun.light_energy = 0.3
-	sun.shadow_enabled = false
-	sun.rotation_degrees = Vector3(-55, 30, 0)
-	add_child(sun)
-
+# --- Мир: строит ls_world.gd; здесь только обёртки, чтобы мебель и предметы собирались теми же помощниками.
 
 func _material(color: Color) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.roughness = 0.95
-	return material
+	return world.material(color)
 
 
 func _box(parent: Node, size: Vector3, pos: Vector3, color: Color, solid := true, name_hint := "") -> MeshInstance3D:
-	var mesh := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = size
-	mesh.mesh = box
-	mesh.material_override = _material(color)
-	mesh.position = pos
+	var mesh: MeshInstance3D = world.box(parent, size, pos, color, solid)
 	if name_hint != "":
 		mesh.name = name_hint
-	parent.add_child(mesh)
-	if solid:
-		var body := StaticBody3D.new()
-		var shape := CollisionShape3D.new()
-		var box_shape := BoxShape3D.new()
-		box_shape.size = size
-		shape.shape = box_shape
-		body.add_child(shape)
-		mesh.add_child(body)
 	return mesh
-
-
-func _build_house() -> void:
-	var house := Node3D.new()
-	house.name = "House"
-	add_child(house)
-	for id in ROOMS:
-		var rect: Rect2 = ROOMS[id]["rect"]
-		var center := rect.get_center()
-		_box(house, Vector3(rect.size.x, 0.1, rect.size.y), Vector3(center.x, -0.05, center.y), Color(str(ROOMS[id]["floor"])), true, "Floor_" + id)
-		# Потолок: виден снизу, светлый.
-		_box(house, Vector3(rect.size.x, 0.1, rect.size.y), Vector3(center.x, WALL_H + 0.05, center.y), Color("#f4f0e8"), false, "Ceiling_" + id)
-		var lamp := OmniLight3D.new()
-		lamp.position = Vector3(center.x, WALL_H - 0.3, center.y)
-		lamp.light_color = Color("#fff3d6")
-		lamp.light_energy = 0.9
-		lamp.omni_range = 6.5
-		lamp.shadow_enabled = false
-		house.add_child(lamp)
-	var wall_color := Color("#f7e9d2")
-	# Внешние стены (с окнами) и внутренние (с дверными проёмами 1 м).
-	_wall(house, Vector2(0, 0), Vector2(12, 0), wall_color, [], [2.0, 6.2, 10.2])
-	_wall(house, Vector2(0, 9), Vector2(12, 9), wall_color, [], [2.0, 6.2, 10.2])
-	_wall(house, Vector2(0, 0), Vector2(0, 9), wall_color, [], [2.2])
-	_wall(house, Vector2(12, 0), Vector2(12, 9), wall_color, [], [2.2, 6.8])
-	_wall(house, Vector2(4, 0), Vector2(4, 9), Color("#f3dcc0"), [2.4, 6.8], [])
-	_wall(house, Vector2(8.5, 0), Vector2(8.5, 9), Color("#dcecf3"), [2.4, 6.8], [])
-	_wall(house, Vector2(0, 4.5), Vector2(4, 4.5), Color("#f3dcc0"), [], [])
-	_wall(house, Vector2(8.5, 4.5), Vector2(12, 4.5), Color("#e6d2e0"), [], [])
-	# Плинтус-полоска цвета, чтобы комнаты различались и по стенам.
-	var sky := Color("#bfe6ff")
-	for id in ROOMS:
-		var rect: Rect2 = ROOMS[id]["rect"]
-		var center := rect.get_center()
-		var strip := Color(str(ROOMS[id]["floor"])).darkened(0.25)
-		_box(house, Vector3(rect.size.x - 0.2, 0.12, 0.03), Vector3(center.x, 0.06, rect.position.y + WALL_T * 0.5 + 0.02), strip, false)
-		_box(house, Vector3(rect.size.x - 0.2, 0.12, 0.03), Vector3(center.x, 0.06, rect.end.y - WALL_T * 0.5 - 0.02), strip, false)
-	# Окна: светлые «стёкла» на внешних стенах и мягкий свет от них.
-	for x in [2.0, 6.2, 10.2]:
-		_window(house, Vector3(x, 1.6, WALL_T * 0.5 + 0.01), 0.0, sky)
-		_window(house, Vector3(x, 1.6, 9.0 - WALL_T * 0.5 - 0.01), 0.0, sky)
-	_window(house, Vector3(WALL_T * 0.5 + 0.01, 1.6, 2.2), PI / 2, sky)
-	_window(house, Vector3(12.0 - WALL_T * 0.5 - 0.01, 1.6, 2.2), PI / 2, sky)
-	_window(house, Vector3(12.0 - WALL_T * 0.5 - 0.01, 1.6, 6.8), PI / 2, sky)
-
-
-## Стена от a до b (в плане, метры). doors — координаты вдоль стены, где проём 1 м (до высоты 2,1 м);
-## windows — где окно (глухая стена, стекло рисует _window).
-func _wall(parent: Node, a: Vector2, b: Vector2, color: Color, doors: Array, _windows: Array) -> void:
-	var along := b - a
-	var length := along.length()
-	var dir := along / length
-	var horizontal := absf(dir.x) > absf(dir.y)
-	var cuts: Array = []
-	for d in doors:
-		cuts.append([float(d) - 0.5, float(d) + 0.5])
-	cuts.sort_custom(func(p, q): return p[0] < q[0])
-	var cursor := 0.0
-	for cut in cuts:
-		_wall_piece(parent, a, dir, cursor, cut[0], 0.0, WALL_H, color, horizontal)
-		_wall_piece(parent, a, dir, cut[0], cut[1], 2.1, WALL_H, color, horizontal)  # перекладина над дверью
-		cursor = cut[1]
-	_wall_piece(parent, a, dir, cursor, length, 0.0, WALL_H, color, horizontal)
-
-
-func _wall_piece(parent: Node, a: Vector2, dir: Vector2, from: float, to: float, y0: float, y1: float, color: Color, horizontal: bool) -> void:
-	if to - from < 0.01:
-		return
-	var mid := a + dir * ((from + to) * 0.5)
-	var size := Vector3(to - from, y1 - y0, WALL_T) if horizontal else Vector3(WALL_T, y1 - y0, to - from)
-	_box(parent, size, Vector3(mid.x, (y0 + y1) * 0.5, mid.y), color)
-
-
-func _window(parent: Node, pos: Vector3, yaw: float, sky: Color) -> void:
-	var frame := _box(parent, Vector3(1.3, 1.1, 0.03), pos, Color("#ffffff"), false)
-	frame.rotation.y = yaw
-	var glass := MeshInstance3D.new()
-	var quad := BoxMesh.new()
-	quad.size = Vector3(1.15, 0.95, 0.02)
-	glass.mesh = quad
-	var material := _material(sky)
-	material.emission_enabled = true
-	material.emission = sky
-	material.emission_energy_multiplier = 1.4
-	glass.material_override = material
-	glass.position = Vector3(0, 0, 0.012)
-	frame.add_child(glass)
-	# Второе стекло с другой стороны стены — чтобы окно было видно и снаружи комнаты (в соседней комнате его нет).
-	var light := OmniLight3D.new()
-	light.light_color = Color("#dff2ff")
-	light.light_energy = 0.45
-	light.omni_range = 3.5
-	light.shadow_enabled = false
-	light.position = Vector3(0, 0, 0.3)
-	frame.add_child(light)
 
 
 # --- Мебель и предметы ------------------------------------------------------------------
 
-## Ставит модель Kenney ногами на пол в точку pos (центр модели по x и z), повёрнутую на yaw градусов.
-## solid — добавить коробку столкновений. Возвращает узел-обёртку (имя = name).
 func _place(parent: Node, path: String, model_scale: float, pos: Vector3, yaw_deg: float, solid := true, item_name := "", wrapper: Node3D = null) -> Node3D:
-	if wrapper == null:
-		wrapper = Node3D.new()
-	if item_name != "":
-		wrapper.name = item_name
-	parent.add_child(wrapper)
-	var model := _instance_model(path)
-	if model == null:
-		push_warning("Нет модели %s" % path)
-		return wrapper
-	wrapper.add_child(model)
-	model.scale = Vector3.ONE * model_scale
-	var aabb := _model_aabb(model)
-	var center := aabb.get_center()
-	model.position = Vector3(-center.x, -aabb.position.y, -center.z)
-	wrapper.position = pos
-	wrapper.rotation_degrees.y = yaw_deg
-	if solid:
-		var body := StaticBody3D.new()
-		var shape := CollisionShape3D.new()
-		var box := BoxShape3D.new()
-		box.size = Vector3(maxf(aabb.size.x, 0.1), maxf(aabb.size.y, 0.1), maxf(aabb.size.z, 0.1))
-		shape.shape = box
-		shape.position = Vector3(0, aabb.size.y * 0.5, 0)
-		body.add_child(shape)
-		wrapper.add_child(body)
-	wrapper.set_meta("size", aabb.size)
-	return wrapper
+	return world.place(parent, path, model_scale, pos, yaw_deg, solid, item_name, wrapper)
 
 
-## Перекрасить поверхность модели по имени материала (копия материала, остальные модели не трогаются).
 func _tint_surface(node: Node3D, material_name: String, color: Color) -> void:
-	for mesh in node.find_children("*", "MeshInstance3D", true, false):
-		var m: Mesh = (mesh as MeshInstance3D).mesh
-		if m == null:
-			continue
-		for i in m.get_surface_count():
-			var material := m.surface_get_material(i)
-			if material is BaseMaterial3D and material.resource_name == material_name:
-				var copy: BaseMaterial3D = material.duplicate()
-				copy.albedo_color = color
-				(mesh as MeshInstance3D).set_surface_override_material(i, copy)
+	World.tint_surface(node, material_name, color)
 
 
 func _instance_model(path: String) -> Node3D:
-	if not _models.has(path):
-		var packed := load(path) as PackedScene
-		if packed == null:
-			return null
-		_models[path] = packed
-	var node: Node3D = (_models[path] as PackedScene).instantiate()
-	# У наборов Kenney metallic = 1: без отражений такие поверхности выходят чёрными. Делаем матовыми.
-	for mesh in node.find_children("*", "MeshInstance3D", true, false):
-		var m: Mesh = (mesh as MeshInstance3D).mesh
-		if m == null:
-			continue
-		for i in m.get_surface_count():
-			var material := m.surface_get_material(i)
-			if material is BaseMaterial3D and (material as BaseMaterial3D).metallic > 0.0:
-				(material as BaseMaterial3D).metallic = 0.0
-				(material as BaseMaterial3D).roughness = 0.9
-	return node
-
-
-static func _model_aabb(model: Node3D) -> AABB:
-	var result := AABB()
-	var first := true
-	for mesh in model.find_children("*", "MeshInstance3D", true, false):
-		var box: AABB = mesh.global_transform * mesh.get_aabb()
-		result = box if first else result.merge(box)
-		first = false
-	return result
+	return world.instance_model(path)
 
 
 func _build_furniture() -> void:
@@ -416,6 +341,8 @@ func _build_furniture() -> void:
 	_place(root, FURNITURE + "lampRoundFloor.glb", fs, Vector3(0.4, 0, 0.5), 0, true)
 	_place(root, FURNITURE + "sideTable.glb", fs, Vector3(2.4, 0, 0.4), 0, true)
 	_place(root, FURNITURE + "radio.glb", fs, Vector3(2.4, 0.76, 0.4), 0, false)
+	_place(root, FURNITURE + "plantSmall2.glb", fs, Vector3(2.05, 0.76, 0.4), 0, false)
+	_place(root, FURNITURE + "lampWall.glb", fs, Vector3(2.0, 1.75, 0.12), 0, false)
 	# Гостиная: диван, столик, телевизор, растение, ковёр, лампа.
 	_place(root, FURNITURE + "loungeSofa.glb", fs, Vector3(6.25, 0, 8.3), 180, true, "Sofa")
 	_place(root, FURNITURE + "tableCoffee.glb", fs, Vector3(6.25, 0, 6.6), 0, true)
@@ -426,6 +353,14 @@ func _build_furniture() -> void:
 	_place(root, FURNITURE + "lampRoundFloor.glb", fs, Vector3(8.1, 0, 8.5), 0, true)
 	_place(root, FURNITURE + "loungeChair.glb", fs, Vector3(8.0, 0, 4.0), -90, true)
 	_place(root, FURNITURE + "coatRackStanding.glb", fs, Vector3(4.4, 0, 8.5), 0, true)
+	var bookcase := _place(root, FURNITURE + "bookcaseClosed.glb", fs, Vector3(4.45, 0, 4.6), 90, true)
+	_tint_surface(bookcase, "wood", Color("#b98755"))  # под цвет паркета
+	var sofa: Node3D = _props.get("Sofa", null)
+	var sofa_h: float = ((sofa.get_meta("size") as Vector3).y * 0.55) if sofa != null else 0.4
+	_place(root, FURNITURE + "pillowBlue.glb", fs * 0.8, Vector3(5.5, sofa_h, 8.35), 20, false)
+	_place(root, FURNITURE + "pillowBlue.glb", fs * 0.8, Vector3(7.0, sofa_h, 8.35), -15, false)
+	_place(root, FURNITURE + "loungeSofaOttoman.glb", fs, Vector3(7.6, 0, 6.6), 0, true)
+	_place(root, FURNITURE + "plantSmall3.glb", fs, Vector3(6.25, 0.46, 6.6), 0, false)
 	# Кухня: холодильник, плита, мойка, шкафы, стол со стульями, еда.
 	_place(root, FURNITURE + "kitchenFridge.glb", fs, Vector3(11.5, 0, 0.5), 0, true)
 	_place(root, FURNITURE + "kitchenStove.glb", fs, Vector3(10.6, 0, 0.55), 0, true)
@@ -433,6 +368,11 @@ func _build_furniture() -> void:
 	_place(root, FURNITURE + "kitchenCabinetUpper.glb", fs, Vector3(9.7, 1.5, 0.3), 0, false)
 	_place(root, FURNITURE + "kitchenCabinetUpper.glb", fs, Vector3(10.6, 1.5, 0.3), 0, false)
 	_place(root, FURNITURE + "kitchenMicrowave.glb", fs, Vector3(11.5, 1.9, 0.5), 0, false)
+	var counter := _place(root, FURNITURE + "kitchenCabinet.glb", fs, Vector3(11.6, 0, 1.6), -90, true)
+	var counter_top: float = (counter.get_meta("size") as Vector3).y
+	_place(root, FURNITURE + "toaster.glb", fs, Vector3(11.6, counter_top, 1.35), -90, false)
+	_place(root, FURNITURE + "kitchenCoffeeMachine.glb", fs, Vector3(11.6, counter_top, 1.85), -90, false)
+	_place(root, FURNITURE + "trashcan.glb", fs, Vector3(11.7, 0, 4.15), 0, true)
 	var table := _place(root, FURNITURE + "tableCloth.glb", fs, Vector3(10.2, 0, 3.0), 0, true, "Table")
 	_place(root, FURNITURE + "chair.glb", fs, Vector3(9.3, 0, 3.0), 90, true)
 	_place(root, FURNITURE + "chair.glb", fs, Vector3(11.1, 0, 3.0), -90, true)
@@ -448,11 +388,17 @@ func _build_furniture() -> void:
 	_place(root, FURNITURE + "toilet.glb", fs, Vector3(3.5, 0, 8.2), -90, true)
 	_place(root, FURNITURE + "washer.glb", fs, Vector3(3.4, 0, 5.2), 0, true)
 	_place(root, FURNITURE + "bathroomSink.glb", fs, Vector3(0.45, 0.8, 6.3), 90, true)
+	_place(root, FURNITURE + "rugRounded.glb", fs, Vector3(2.2, 0, 6.8), 0, false)
+	var washer: Node3D = _place(root, FURNITURE + "plantSmall3.glb", fs, Vector3(3.4, 0.0, 5.2), 0, false)
+	washer.position.y = 1.0  # на стиральной машине (её высота 0,5 × 2)
 	_place(root, FURNITURE + "bedDouble.glb", fs, Vector3(10.3, 0, 7.6), 0, true)
 	_place(root, FURNITURE + "sideTable.glb", fs, Vector3(9.0, 0, 8.5), 0, true)
 	_place(root, FURNITURE + "lampRoundTable.glb", fs, Vector3(9.0, 0.76, 8.5), 0, false)
 	_place(root, FURNITURE + "desk.glb", fs, Vector3(11.2, 0, 5.2), 180, true)
 	_place(root, FURNITURE + "chairDesk.glb", fs, Vector3(11.2, 0, 6.0), 180, true)
+	_place(root, FURNITURE + "cabinetBedDrawer.glb", fs, Vector3(11.6, 0, 8.4), -90, true)
+	_place(root, FURNITURE + "lampWall.glb", fs, Vector3(11.88, 1.6, 5.2), -90, false)
+	_place(root, FURNITURE + "plantSmall2.glb", fs, Vector3(10.6, 0.77, 5.1), 0, false)
 	# Игрушки для квеста «Собери игрушки» (появляются, когда квест начнётся) и погремушка в кроватке.
 	_props["Cube"] = _toy_cube(root, Vector3(1.6, 0, 3.6))
 	_props["Book"] = _item(root, FURNITURE + "books.glb", fs, Vector3(3.0, 0, 2.2), "Book", "книжка")
@@ -633,6 +579,7 @@ func _parent(id: String, title: String, skin: String, pos: Vector3, look_at_poin
 		for mesh in model.find_children("*", "MeshInstance3D", true, false):
 			mesh.material_override = material
 		person.model = model
+		person.setup_limbs()
 	var body := StaticBody3D.new()
 	var shape := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
@@ -656,17 +603,34 @@ func _parent(id: String, title: String, skin: String, pos: Vector3, look_at_poin
 	return person
 
 
+## Над целью крутится золотая звёздочка со свечением.
 func _build_marker() -> void:
 	_marker = MeshInstance3D.new()
-	var mesh := SphereMesh.new()
-	mesh.radius = 0.06
-	mesh.height = 0.12
+	var mesh := PrismMesh.new()
+	mesh.size = Vector3(0.12, 0.12, 0.12)
 	_marker.mesh = mesh
-	var material := _material(Color("#ffe060"))
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("#ffd040")
 	material.emission_enabled = true
-	material.emission = Color("#ffd040")
-	material.emission_energy_multiplier = 2.0
+	material.emission = Color("#ffb020")
+	material.emission_energy_multiplier = 0.7
 	_marker.material_override = material
+	var star := Label3D.new()
+	star.text = "★"
+	star.font_size = 140
+	star.pixel_size = 0.003
+	star.modulate = Color("#ffe060")
+	star.outline_modulate = Color("#b07a10")
+	star.outline_size = 16
+	star.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	star.no_depth_test = true
+	star.position.y = 0.22
+	_marker.add_child(star)
+	var light := OmniLight3D.new()
+	light.light_color = Color("#ffd040")
+	light.light_energy = 0.6
+	light.omni_range = 1.5
+	_marker.add_child(light)
 	_marker.visible = false
 	add_child(_marker)
 
@@ -684,7 +648,9 @@ func _start_quest() -> void:
 	var quest := current_quest()
 	_look_time = 0.0
 	_collected = 0
-	_hud.set_quest("Задание %d: %s" % [quest_index + 1, quest["title"]], quest["text"])
+	for item_name in _player.inventory.duplicate():  # новое задание — руки свободны (погремушку и мишку малыш отложил)
+		_player.remove_item(item_name)
+	_hud.set_quest("Задание %d: %s" % [quest_index + 1, quest["title"]], quest["text"], quest_index + 1, QUESTS.size())
 	match str(quest["id"]):
 		"bear":
 			# Мама вынимает малыша из кроватки и ставит на пол.
@@ -722,18 +688,25 @@ func _say_current() -> void:
 		return
 	var who: String = "Мама" if quest["who"] == "mom" else "Папа"
 	_hud.say(who, str(quest.get("say", "")), 5.0)
-	_play("hover")
+	var parent: Node3D = _props.get("Mom" if quest["who"] == "mom" else "Dad")
+	if parent is Parent:
+		(parent as Parent).wave()
+	play_sound("say")
 
 
 func _jump_to_quest(index: int) -> void:
 	# Для снимков и проверок: выполнить все задания до index мгновенно.
 	while quest_index < clampi(index, 0, QUESTS.size()) :
 		var quest := current_quest()
-		_apply_rewards(quest)
+		if not _from_save:
+			_apply_rewards(quest)  # при продолжении навыки уже загружены из сохранения
 		match str(quest["id"]):
 			"bear":
 				_player.teleport(Vector3(2.0, 0.3, 2.0), deg_to_rad(-120))
 				_player.set_mode("crawl")
+			"rattle":
+				_props["Rattle"].visible = false
+				_props["Rattle"].set_meta("available", false)
 			"stand":
 				_player.can_walk = true
 				_player.set_mode("walk")
@@ -744,6 +717,7 @@ func _jump_to_quest(index: int) -> void:
 	if quest_index > 5:
 		_player.can_walk = true
 		_player.set_mode("walk")
+	_from_save = false
 
 
 func _apply_rewards(quest: Dictionary) -> void:
@@ -759,20 +733,61 @@ func _apply_rewards(quest: Dictionary) -> void:
 
 func _complete_quest() -> void:
 	var quest := current_quest()
+	var target := _target_node()
 	_apply_rewards(quest)
-	_play("levelup")
-	_hud.toast("Задание выполнено: %s" % quest["title"], 3.0)
+	play_sound("levelup")
+	_hud.quest_banner("Задание выполнено!\n%s" % quest["title"])
+	_hud.flash(Color(1.0, 0.9, 0.5, 0.25), 0.5)
+	_sparkle((target.global_position + Vector3.UP * 0.8) if target != null else (_player.global_position + _player.look_dir() * 0.8 + Vector3.UP * 0.6))
 	var who: String = "Мама" if quest["who"] == "mom" else "Папа"
 	_hud.say(who, _praise(), 3.0)
+	var parent: Node3D = _props.get("Mom" if quest["who"] == "mom" else "Dad")
+	if parent is Parent:
+		(parent as Parent).wave()
+	if str(quest["id"]) in ["word"]:
+		get_tree().create_timer(0.6).timeout.connect(func() -> void: play_sound("babble_mama"))
+	elif str(quest["id"]) in ["rattle", "bear", "ball", "toys"]:
+		get_tree().create_timer(0.5).timeout.connect(func() -> void: play_sound("giggle"))
 	print("Задание %d «%s» выполнено; навыки %s; возраст %d мес." % [quest_index + 1, quest["title"], _skills_text(), months])
 	quest_index += 1
 	_refresh_hud()
 	_auto_wait = 1.5
 	if quest_index < QUESTS.size():
+		_save_progress()
 		_start_quest()
 		get_tree().create_timer(3.2).timeout.connect(_say_current)
 	else:
 		_finish_stage()
+
+
+## Золотые искры в точке (выполненное задание).
+func _sparkle(pos: Vector3) -> void:
+	var particles := CPUParticles3D.new()
+	particles.one_shot = true
+	particles.emitting = true
+	particles.amount = 40
+	particles.lifetime = 1.1
+	particles.explosiveness = 0.9
+	particles.direction = Vector3.UP
+	particles.spread = 70.0
+	particles.initial_velocity_min = 1.2
+	particles.initial_velocity_max = 2.4
+	particles.gravity = Vector3(0, -3.0, 0)
+	particles.scale_amount_min = 0.6
+	particles.scale_amount_max = 1.0
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.03
+	mesh.height = 0.06
+	particles.mesh = mesh
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("#ffe060")
+	material.emission_enabled = true
+	material.emission = Color("#ffd040")
+	material.emission_energy_multiplier = 2.5
+	particles.material_override = material
+	add_child(particles)
+	particles.global_position = pos
+	get_tree().create_timer(2.0).timeout.connect(particles.queue_free)
 
 
 func _praise() -> String:
@@ -783,8 +798,17 @@ func _praise() -> String:
 ## Герой зовёт при каждом падении: ноги крепнут, папа подбадривает.
 func on_fall() -> void:
 	add_skill("legs", 2.5)
-	_play("hurt")
+	play_sound("hurt")
+	_hud.flash(Color(0.9, 0.3, 0.3, 0.3), 0.6)
 	_hud.toast("Упал! Ничего страшного — Пробел, чтобы встать снова", 2.5)
+
+
+## E в пустоту: подсказать, как брать предметы (не чаще раза в пару секунд).
+func on_interact_nothing() -> void:
+	if _nothing_time > 0.0:
+		return
+	_nothing_time = 2.5
+	_hud.toast("Рядом нечего взять: подойди ближе и смотри прямо на предмет", 2.0)
 
 
 ## Пробел, когда ходьба ещё не открыта: проверяем, хватает ли навыка.
@@ -792,6 +816,7 @@ func on_try_stand() -> void:
 	if skills["legs"] >= LEGS_TO_STAND:
 		_player.can_walk = true
 		_player.set_mode("walk")
+		play_sound("stand")
 		_hud.toast("Ты встал на ножки!", 3.0)
 		if str(current_quest().get("id", "")) == "stand":
 			_complete_quest()
@@ -810,6 +835,7 @@ func add_skill(id: String, amount: float) -> void:
 	_player.legs = skills["legs"]
 	if amount >= 1.0:
 		_refresh_hud()
+		_hud.skill_popup(id, amount * bonus)
 
 
 func _skills_text() -> String:
@@ -843,7 +869,7 @@ func on_interact(node: Node3D, item_name: String) -> void:
 				_update_marker()
 			elif item_name == quest["receiver"] and _player.has_item(str(quest["target"])):
 				_player.remove_item(str(quest["target"]))
-				_play("pickup")
+				play_sound("pickup")
 				_complete_quest()
 			elif item_name == "Mom" or item_name == "Dad":
 				_say_current()
@@ -853,10 +879,10 @@ func on_interact(node: Node3D, item_name: String) -> void:
 				_pickup_into_hands(node, item_name)
 				_hud.toast("Теперь положи в коробку", 2.0)
 				_update_marker()
-			elif item_name == quest["box"] and not _player.inventory.is_empty():
+			elif item_name == quest["box"] and not _player.inventory.is_empty() and targets.has(_player.inventory[0]):
 				_player.remove_item(_player.inventory[0])
 				_collected += 1
-				_play("pickup")
+				play_sound("pickup")
 				add_skill("hands", 2.0)
 				_hud.toast("Убрано %d из %d" % [_collected, targets.size()], 2.0)
 				if _collected >= targets.size():
@@ -895,7 +921,7 @@ func _pickup_into_hands(node: Node3D, item_name: String) -> void:
 	node.visible = false
 	_player.add_item(item_name, copy)
 	add_skill("hands", 1.5)
-	_play("pickup")
+	play_sound("pickup")
 	_hud.toast("Ты взял: %s" % title, 1.5)
 
 
@@ -944,31 +970,127 @@ func _finish_stage() -> void:
 	_refresh_hud()
 	_hud.set_quest("Этап пройден", "Тебе три года. Впереди садик!")
 	_marker.visible = false
-	_save()
+	_save_final()
 	var text := "[b]Тебе исполнилось 3 года![/b]\n\nМладенчество пройдено. Вот каким ты вырос:\n"
 	for id in skills:
 		text += "• %s: %d\n" % [_hud.SKILL_TITLES[id], int(skills[id])]
 	text += "• Отношения с мамой: %d, с папой: %d\n" % [int(relations["mom"]), int(relations["dad"])]
 	text += "• Падений, пока учился ходить: %d\n\n" % _player.falls
-	text += "Прогресс сохранён. Следующий этап — [b]садик[/b] — появится в следующей версии игры.\n"
-	text += "[color=#ffe08a]Esc — отпустить мышь, закрыть окно игры можно крестиком.[/color]"
+	text += "Итог сохранён. Следующий этап — [b]садик[/b] — появится в следующей версии игры."
 	_hud.show_end(text)
-	_play("win")
+	play_sound("win")
 	print("Жизнь: этап «младенчество» пройден; навыки %s; отношения мама %d папа %d; падений %d" % [_skills_text(), int(relations["mom"]), int(relations["dad"]), _player.falls])
 	if _test.get("quit", "0") == "1":
 		get_tree().create_timer(1.0).timeout.connect(func() -> void: get_tree().quit(0))
 
 
-func _save() -> void:
-	var data := {"stage": "infancy", "stage_done": true, "skills": skills, "relations": relations, "months": months,
-		"falls": _player.falls, "saved_at": Time.get_datetime_string_from_system()}
+func _read_save() -> Dictionary:
+	if not FileAccess.file_exists(SAVE_PATH):
+		return {}
+	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if file == null:
+		return {}
+	var data: Variant = JSON.parse_string(file.get_as_text())
+	file.close()
+	return data if data is Dictionary else {}
+
+
+func _write_save(data: Dictionary) -> void:
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
 		print("Жизнь: не удалось сохранить (%s)" % error_string(FileAccess.get_open_error()))
 		return
 	file.store_string(JSON.stringify(data, "  "))
 	file.close()
-	print("Жизнь: сохранено в %s" % SAVE_PATH)
+
+
+## Есть ли незаконченная жизнь, которую можно продолжить.
+func _has_progress() -> bool:
+	var data := _read_save()
+	return data.has("progress") and int((data["progress"] as Dictionary).get("quest_index", 0)) < QUESTS.size()
+
+
+## Прогресс пишется после каждого задания: с какого задания продолжать, навыки, отношения, возраст.
+func _save_progress() -> void:
+	var data := _read_save()
+	data["progress"] = {"quest_index": quest_index, "skills": skills.duplicate(), "relations": relations.duplicate(),
+		"months": months, "falls": _player.falls, "can_walk": _player.can_walk, "saved_at": Time.get_datetime_string_from_system()}
+	_write_save(data)
+	print("Жизнь: прогресс сохранён (задание %d)" % (quest_index + 1))
+
+
+func _load_progress() -> bool:
+	var data := _read_save()
+	if not data.has("progress"):
+		return false
+	var p: Dictionary = data["progress"]
+	var index := int(p.get("quest_index", 0))
+	if index >= QUESTS.size():
+		return false
+	_reset_state()
+	for id in skills:
+		skills[id] = float((p.get("skills", {}) as Dictionary).get(id, 0.0))
+	for id in relations:
+		relations[id] = float((p.get("relations", {}) as Dictionary).get(id, 30.0))
+	months = int(p.get("months", 0))
+	_player.falls = int(p.get("falls", 0))
+	_player.legs = skills["legs"]
+	_test["quest"] = str(index)  # _begin_game перенесёт малыша к нужному заданию
+	_from_save = true
+	_refresh_hud()
+	print("Жизнь: продолжаем с задания %d" % (index + 1))
+	return true
+
+
+## Итог этапа: хранится отдельно от прогресса (задел для «начать новую жизнь с садика»), прогресс стирается.
+func _save_final() -> void:
+	var data := _read_save()
+	data["stage"] = "infancy"
+	data["stage_done"] = true
+	data["skills"] = skills.duplicate()
+	data["relations"] = relations.duplicate()
+	data["months"] = months
+	data["falls"] = _player.falls
+	data["saved_at"] = Time.get_datetime_string_from_system()
+	data.erase("progress")
+	_write_save(data)
+	print("Жизнь: итог этапа сохранён в %s" % SAVE_PATH)
+
+
+func _reset_progress() -> void:
+	var data := _read_save()
+	data.erase("progress")
+	_write_save(data)
+	_reset_state()
+
+
+## Вернуть игру к началу: малыш в кроватке, навыки по нулям, предметы на местах.
+func _reset_state() -> void:
+	for id in skills:
+		skills[id] = 0.0
+	relations = {"mom": 30.0, "dad": 30.0}
+	months = 0
+	quest_index = 0
+	stage_done = false
+	_month_time = 0.0
+	_collected = 0
+	_auto_path.clear()
+	for item_name in _player.inventory.duplicate():
+		_player.remove_item(item_name)
+	_player.falls = 0
+	_player.can_walk = false
+	_player.legs = 0.0
+	_player.teleport(_props["Crib"].global_position + Vector3(0, 0.55, 0), PI)
+	_player.set_mode("lie")
+	for id in ["Bear", "Rattle", "Ball", "Apple", "Cube", "Book", "Car"]:
+		_props[id].visible = id in ["Bear", "Rattle"]
+		_props[id].set_meta("available", id in ["Bear", "Rattle"])
+	for id in ["Crib", "Bookcase", "ToyBox"]:
+		_props[id].set_meta("available", false)
+	_props["ToyBox"].visible = true
+	_props["Mom"].teleport_to(Vector3(2.3, 0, 1.6))
+	_props["Dad"].teleport_to(Vector3(9.4, 0, 3.6))
+	_refresh_hud()
 
 
 # --- Цель на экране и лампочка ----------------------------------------------------------------
@@ -1001,10 +1123,7 @@ func _update_marker() -> void:
 
 
 func _room_of(point: Vector3) -> String:
-	for id in ROOMS:
-		if (ROOMS[id]["rect"] as Rect2).has_point(Vector2(point.x, point.z)):
-			return ROOMS[id]["title"]
-	return "дом"
+	return world.room_title(world.room_of(point))
 
 
 func _direction_word(target: Node3D) -> String:
@@ -1031,7 +1150,7 @@ func _update_lamp() -> void:
 		text = "[b]Что делать сейчас[/b]\n%s\n\n" % quest["text"]
 		var target := _target_node()
 		if target != null:
-			text += "[b]Куда идти[/b]\nЦель — %s. Она в комнате «%s»: %s. Над целью светится жёлтый шарик.\n\n" % [_target_title(target), _room_of(target.global_position), _direction_word(target)]
+			text += "[b]Куда идти[/b]\nЦель — %s. Она в комнате «%s»: %s. Над целью крутится золотая звёздочка.\n\n" % [_target_title(target), _room_of(target.global_position), _direction_word(target)]
 		elif str(quest["type"]) == "stand":
 			text += "[b]Куда идти[/b]\nНикуда: просто нажми Пробел. Навык «Ноги» сейчас %d, нужно %d.\n\n" % [int(skills["legs"]), int(LEGS_TO_STAND)]
 	text += "[b]Что ты умеешь[/b]\n"
@@ -1057,21 +1176,93 @@ func _target_title(target: Node3D) -> String:
 
 # --- Звук ---------------------------------------------------------------------------------------
 
+## Две шины громкости: Music (колыбельная и двор) и SFX (всё остальное); их крутят ползунки настроек.
+func _setup_audio() -> void:
+	_music_bus = AudioServer.get_bus_index("Music")
+	if _music_bus < 0:
+		AudioServer.add_bus()
+		_music_bus = AudioServer.bus_count - 1
+		AudioServer.set_bus_name(_music_bus, "Music")
+	_sfx_bus = AudioServer.get_bus_index("SFX")
+	if _sfx_bus < 0:
+		AudioServer.add_bus()
+		_sfx_bus = AudioServer.bus_count - 1
+		AudioServer.set_bus_name(_sfx_bus, "SFX")
+
+
+## Звуки по именам событий. Для каждого — список файлов (варианты шагов) и громкость в дБ.
+const SOUND_TABLE := {
+	"hover": [["hover"], -14.0], "click": [["click"], -8.0], "pickup": [["pickup"], -6.0],
+	"levelup": [["levelup"], -4.0], "hurt": [["hurt"], -6.0], "win": [["win"], -3.0], "say": [["select"], -12.0],
+	"correct": [["heal"], -8.0], "wrong": [["hover"], -8.0], "stand": [["relic"], -8.0],
+	"step": [["step0", "step1", "step2", "step3"], -14.0],
+	"crawl": [["@crawl0", "@crawl1", "@crawl2"], -10.0],
+	"giggle": [["@giggle"], -6.0], "babble_mama": [["@babble_mama"], -4.0], "babble_dada": [["@babble_dada"], -4.0],
+}
+
+
 func _load_sounds() -> void:
-	for id in ["hover", "pickup", "levelup", "hurt", "win", "click"]:
-		var path: String = SOUNDS + str(id) + ".ogg"
-		if not ResourceLoader.exists(path):
+	for id in SOUND_TABLE:
+		var spec: Array = SOUND_TABLE[id]
+		var streams: Array = []
+		for file_name in spec[0]:
+			var name_str := str(file_name)
+			var path: String = (AUDIO + name_str.trim_prefix("@") + ".wav") if name_str.begins_with("@") else (SOUNDS + name_str + ".ogg")
+			if ResourceLoader.exists(path):
+				streams.append(load(path))
+		if streams.is_empty():
 			continue
 		var player := AudioStreamPlayer.new()
-		player.stream = load(path)
-		player.volume_db = -8.0
+		player.name = "Sound_" + id
+		player.volume_db = float(spec[1])
+		player.bus = "SFX"
+		player.max_polyphony = 3
 		add_child(player)
-		_sounds[id] = player
+		_sounds[id] = {"player": player, "streams": streams}
 
 
-func _play(id: String) -> void:
-	if _sounds.has(id):
-		_sounds[id].play()
+## Сыграть звук события; из нескольких вариантов берётся случайный, высота чуть плавает — так живее.
+func play_sound(id: String) -> void:
+	if not _sounds.has(id):
+		return
+	var entry: Dictionary = _sounds[id]
+	var player: AudioStreamPlayer = entry["player"]
+	var streams: Array = entry["streams"]
+	player.stream = streams[randi() % streams.size()]
+	player.pitch_scale = randf_range(0.94, 1.06)
+	player.play()
+
+
+## Шаг малыша: на ножках — шаги, ползком — шорох ладошек.
+func play_step(mode: String) -> void:
+	play_sound("step" if mode == "walk" else "crawl")
+
+
+## Колыбельная и двор за окном — петлёй, тихо, на шине Music (играют и в меню, и на паузе).
+func _play_music() -> void:
+	if _music != null:
+		return
+	_music = _loop_player(AUDIO + "lullaby.wav", -10.0)
+	_ambient = _loop_player(AUDIO + "ambient_day.wav", -16.0)
+
+
+func _loop_player(path: String, volume_db: float) -> AudioStreamPlayer:
+	if not ResourceLoader.exists(path):
+		return null
+	var stream: AudioStream = load(path)
+	if stream is AudioStreamWAV:
+		stream = (stream as AudioStreamWAV).duplicate()
+		(stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
+		(stream as AudioStreamWAV).loop_begin = 0
+		(stream as AudioStreamWAV).loop_end = (stream as AudioStreamWAV).data.size() / 2  # 16 бит моно
+	var player := AudioStreamPlayer.new()
+	player.stream = stream
+	player.volume_db = volume_db
+	player.bus = "Music"
+	player.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(player)
+	player.play()
+	return player
 
 
 # --- Ход времени и самопроверка ----------------------------------------------------------------
@@ -1091,6 +1282,9 @@ func _process(delta: float) -> void:
 	_marker_time += delta
 	if _marker.visible:
 		_marker.position.y += sin(_marker_time * 4.0) * 0.0025
+		_marker.rotation.y += delta * 2.0
+	_nothing_time = maxf(_nothing_time - delta, 0.0)
+	_hud.set_balance(_player.mode == "walk", _player.balance)
 	var quest := current_quest()
 	if not quest.is_empty() and str(quest["type"]) in ["look", "reach"]:
 		var target: Node3D = _props.get(str(quest["target"]))
@@ -1210,23 +1404,20 @@ func route(a: Vector3, b: Vector3) -> Array:
 	var to_room := _room_id(b)
 	var path: Array = []
 	if from_room != to_room:
-		if from_room != "living" and DOORS.has(from_room):
-			var door: Vector3 = DOORS[from_room]
-			path.append(door + (door - ROOM_CENTER[from_room]).normalized() * -0.6)
-			path.append(door + (door - ROOM_CENTER[from_room]).normalized() * 0.6)
-		if to_room != "living" and DOORS.has(to_room):
-			var door: Vector3 = DOORS[to_room]
-			path.append(door + (door - ROOM_CENTER[to_room]).normalized() * 0.6)
-			path.append(door + (door - ROOM_CENTER[to_room]).normalized() * -0.6)
+		if from_room != "living" and World.DOORS.has(from_room):
+			var door: Vector3 = World.DOORS[from_room]
+			path.append(door + (door - World.ROOM_CENTER[from_room]).normalized() * -0.6)
+			path.append(door + (door - World.ROOM_CENTER[from_room]).normalized() * 0.6)
+		if to_room != "living" and World.DOORS.has(to_room):
+			var door: Vector3 = World.DOORS[to_room]
+			path.append(door + (door - World.ROOM_CENTER[to_room]).normalized() * 0.6)
+			path.append(door + (door - World.ROOM_CENTER[to_room]).normalized() * -0.6)
 	path.append(b)
 	return path
 
 
 func _room_id(point: Vector3) -> String:
-	for id in ROOMS:
-		if (ROOMS[id]["rect"] as Rect2).has_point(Vector2(point.x, point.z)):
-			return id
-	return "living"
+	return world.room_of(point)
 
 
 # --- Вложенные классы -----------------------------------------------------------------------
@@ -1259,10 +1450,46 @@ class Parent extends Node3D:
 	var _goal := Vector3.ZERO
 	var _walking := false
 	var _time := 0.0
+	var _anim := 0.0
+	var _wave_time := 0.0
+	var _limbs := {}
 
 	func _ready() -> void:
 		set_meta("size", Vector3(0.6, 1.6, 0.4))
 		_goal = position
+
+	## Шарниры рук и ног (как у героя «Кладбища»): плечи на высоте 12, бёдра на 6 в единицах модели.
+	func setup_limbs() -> void:
+		if model == null:
+			return
+		for limb in [["ArmLeft1", Vector3(3, 12, 0)], ["ArmRight1", Vector3(-3, 12, 0)], ["LegLeft1", Vector3(1, 6, 0)], ["LegRight1", Vector3(-1, 6, 0)]]:
+			var limb_name := str(limb[0])
+			var joint: Vector3 = limb[1]
+			var mesh := model.find_child(limb_name, true, false)
+			if mesh == null:
+				continue
+			var pivot := Node3D.new()
+			pivot.name = limb_name + "Pivot"
+			pivot.position = joint
+			mesh.get_parent().add_child(pivot)
+			mesh.reparent(pivot, false)
+			mesh.position = -joint
+			_limbs[limb_name] = pivot
+
+	func _set_limb(limb_name: String, angle: float, roll := 0.0) -> void:
+		if _limbs.has(limb_name):
+			var pivot: Node3D = _limbs[limb_name]
+			pivot.rotation.x = angle
+			pivot.rotation.z = roll
+
+	## Помахать рукой (когда говорит с малышом).
+	func wave() -> void:
+		_wave_time = 1.6
+
+	func teleport_to(point: Vector3) -> void:
+		position = point
+		_goal = point
+		_walking = false
 
 	func prompt() -> String:
 		return "E — поговорить с %s" % ("мамой" if title == "Мама" else "папой")
@@ -1299,3 +1526,16 @@ class Parent extends Node3D:
 				rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), 1.0 - exp(-3.0 * delta))
 		if model != null:
 			model.position.y = (absf(sin(_time * 9.0)) * 0.06) if _walking else (sin(_time * 1.5) * 0.015)
+		# Руки и ноги: при ходьбе качаются в противофазе, стоя — лёгкое дыхание; машет правой рукой.
+		var move := 1.0 if _walking else 0.0
+		_anim += delta * (11.0 if _walking else 1.5)
+		var swing := sin(_anim) * 0.75 * move
+		var idle := sin(_time * 1.5) * 0.05
+		_set_limb("LegLeft1", swing)
+		_set_limb("LegRight1", -swing)
+		_set_limb("ArmLeft1", -swing + idle)
+		if _wave_time > 0.0:
+			_wave_time -= delta
+			_set_limb("ArmRight1", -2.6 + sin(_time * 14.0) * 0.25, -0.5)
+		else:
+			_set_limb("ArmRight1", swing + idle, 0.0)
