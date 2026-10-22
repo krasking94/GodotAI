@@ -598,9 +598,14 @@ SETUP_FILES = [  # что копируется: (откуда относител
     ("game/gy_sky.gdshader", "game/gy_sky.gdshader"),
     ("game/gy_ice.gdshader", "game/gy_ice.gdshader"),
     ("tools/enginectl/examples/graveyard.json", "tools/enginectl/examples/graveyard.json"),
+    ("game/ls_game.gd", "game/ls_game.gd"),
+    ("game/ls_player.gd", "game/ls_player.gd"),
+    ("game/ls_hud.gd", "game/ls_hud.gd"),
+    ("tools/enginectl/examples/lifesim.json", "tools/enginectl/examples/lifesim.json"),
 ]
 # Папки копируются целиком (кроме *.import, их создаст Godot): city и racing нужны картам «Кладбища» (дома, машины).
-SETUP_DIRS = ["assets/kenney/platformer", "assets/kenney/graveyard", "assets/kenney/characters", "assets/kenney/city", "assets/kenney/racing"]
+SETUP_DIRS = ["assets/kenney/platformer", "assets/kenney/graveyard", "assets/kenney/characters", "assets/kenney/city", "assets/kenney/racing",
+              "assets/kenney/furniture", "assets/kenney/food"]  # furniture и food — дом «Симулятора жизни»
 PLUGIN_ENTRY = 'res://addons/ai_bridge/plugin.cfg'
 MIN_GITIGNORE = "# Служебные папки Godot\n.godot/\n.import/\nexport_presets.cfg\n\n# Сборки\nbuild/\n*.apk\n*.exe\n*.pck\n\n# Секреты\n.env\n*.keystore\n"
 
