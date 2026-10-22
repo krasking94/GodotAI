@@ -3,7 +3,7 @@ extends CanvasLayer
 ## Табло «Кладбища»: полоса здоровья, таймер, уровень, убитые, рекорд, полоса опыта внизу, красная вспышка
 ## при ударе, большие надписи (победа, поражение), окно прокачки (три карточки с рисованными значками и пометкой
 ## «Рекомендуется»: клавиши 1 2 3, стрелки и Enter или мышь) и стартовое меню
-## (← → скин, Enter — начать). Работает и на паузе (process_mode ALWAYS): окно прокачки показывается,
+## (← → карта, ↑ ↓ скин, Enter — начать). Под полосой здоровья — название карты. Работает и на паузе (process_mode ALWAYS): окно прокачки показывается,
 ## когда игра стоит. Все клавиши меню, прокачки и R обрабатываются здесь и передаются в gy_game.gd.
 
 var game: Node = null
@@ -29,6 +29,9 @@ var _relic_label: Label
 var _menu_panel: PanelContainer
 var _menu_skin: Label
 var _menu_best: Label
+var _menu_map: Label
+var _menu_subtitle: Label
+var _map_label: Label
 var _auto_timer := 0.0
 
 
@@ -47,6 +50,10 @@ func _ready() -> void:
 	_hp_label = _make_label(18)
 	_hp_label.position = Vector2(26, 15)
 	add_child(_hp_label)
+	_map_label = _make_label(17)
+	_map_label.position = Vector2(18, 44)
+	_map_label.modulate = Color(1, 1, 1, 0.8)
+	add_child(_map_label)
 	_time_label = _make_label(40)
 	_time_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_time_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
@@ -307,20 +314,31 @@ func _build_menu() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_color_override("font_color", Color("#ffb347"))
 	column.add_child(title)
-	var subtitle := _make_label(20)
-	subtitle.text = "Продержись три минуты против орды нежити"
+	var subtitle := _make_label(18)
+	subtitle.text = "Продержись ночь против орды нежити"
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle.modulate = Color(1, 1, 1, 0.8)
 	column.add_child(subtitle)
-	_menu_skin = _make_label(26)
-	_menu_skin.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(_menu_skin)
-	var hint := _make_label(18)
-	hint.text = "Стрелки или WASD — бегать, герой стреляет сам\n1 2 3 — выбор прокачки на новом уровне\nEnter — начать"
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(hint)
+	_menu_map = _make_label(30)
+	_menu_map.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_menu_map.add_theme_color_override("font_color", Color("#ffe0a0"))
+	column.add_child(_menu_map)
+	_menu_subtitle = _make_label(17)
+	_menu_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_menu_subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_menu_subtitle.custom_minimum_size = Vector2(560, 0)
+	column.add_child(_menu_subtitle)
 	_menu_best = _make_label(18)
 	_menu_best.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_menu_best)
+	_menu_skin = _make_label(24)
+	_menu_skin.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(_menu_skin)
+	var hint := _make_label(16)
+	hint.text = "← → карта · ↑ ↓ герой · Enter — начать\nСтрелки или WASD — бегать, герой стреляет сам, 1 2 3 — прокачка"
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.modulate = Color(1, 1, 1, 0.65)
+	column.add_child(hint)
 	_menu_panel.add_child(column)
 	_menu_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	_menu_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
@@ -364,14 +382,20 @@ func _input(event: InputEvent) -> void:
 				game.choose_upgrade(_levelup_focus)
 		"menu":
 			if key == KEY_LEFT or key == KEY_A:
-				game.menu_skin(-1)
+				game.menu_map(-1)
 			elif key == KEY_RIGHT or key == KEY_D:
+				game.menu_map(1)
+			elif key == KEY_UP or key == KEY_W:
+				game.menu_skin(-1)
+			elif key == KEY_DOWN or key == KEY_S:
 				game.menu_skin(1)
 			elif key == KEY_ENTER or key == KEY_KP_ENTER or key == KEY_SPACE:
 				game.start_game()
 		"won", "over":
-			if key == KEY_R or key == KEY_ENTER or key == KEY_KP_ENTER:
+			if key == KEY_R:
 				game.restart()
+			elif key == KEY_ENTER or key == KEY_KP_ENTER or key == KEY_SPACE:
+				game.to_menu()
 
 
 func set_values(hp: float, max_hp: float, xp: int, xp_needed: int, level: int, time_left: float, kills: int, enemies: int, best: int) -> void:
@@ -436,12 +460,16 @@ func hide_levelup() -> void:
 	_levelup_panel.visible = false
 
 
-func show_menu(skin_title: String, best: int) -> void:
-	_menu_skin.text = "◀  Герой: %s  ▶" % skin_title
-	_menu_best.text = "Рекорд: %d" % best if best > 0 else "Рекорда пока нет"
+func show_menu(map_number: int, map_count: int, map_title: String, map_subtitle: String, best: int, won: bool, skin_title: String) -> void:
+	_menu_map.text = "◀  %d/%d  %s  ▶" % [map_number, map_count, map_title]
+	_menu_subtitle.text = map_subtitle
+	_menu_skin.text = "▲ Герой: %s ▼" % skin_title
+	var record_text := "Рекорд: %d" % best if best > 0 else "Рекорда пока нет"
+	_menu_best.text = record_text + ("  ·  ✓ пройдена" if won else "")
 	_menu_panel.visible = true
 	_hp_bar.visible = false
 	_hp_label.visible = false
+	_map_label.visible = false
 	_xp_bar.visible = false
 	_time_label.visible = false
 	_level_label.visible = false
@@ -449,10 +477,15 @@ func show_menu(skin_title: String, best: int) -> void:
 	_best_label.visible = false
 
 
+func set_map_title(title: String) -> void:
+	_map_label.text = title
+
+
 func hide_menu() -> void:
 	_menu_panel.visible = false
 	_hp_bar.visible = true
 	_hp_label.visible = true
+	_map_label.visible = true
 	_xp_bar.visible = true
 	_time_label.visible = true
 	_level_label.visible = true

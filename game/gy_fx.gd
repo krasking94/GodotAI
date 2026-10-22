@@ -1,6 +1,6 @@
 extends RefCounted
 
-## Эффекты частиц для «Кладбища»: светлячки, падающие листья и искры от попаданий.
+## Эффекты частиц для «Кладбища»: светлячки, падающие листья, снег, дождь, пепел, клочья тумана и искры от попаданий.
 ## Всё на CPUParticles3D (работает и в Forward+, и в режиме совместимости, и без окна),
 ## картинки частиц рисуются кодом: мягкая точка и овальный листок из GradientTexture2D.
 
@@ -168,4 +168,130 @@ static func sparks(color: Color = Color("#ffd27a"), amount: int = 8, size: float
 	p.material_override = _spark_materials[key]
 	p.finished.connect(p.queue_free)
 	p.emitting = true
+	return p
+
+
+## Снег: белые хлопья падают медленно, покачиваясь, из коробки над героем.
+static func snow() -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	p.name = "Snow"
+	p.amount = int(70 * budget())
+	p.lifetime = 7.0
+	p.preprocess = 7.0
+	p.randomness = 0.6
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	p.emission_box_extents = Vector3(17, 0.5, 13)
+	p.direction = Vector3(0.3, -1.0, 0.1)
+	p.spread = 20.0
+	p.gravity = Vector3(0, -0.25, 0)
+	p.initial_velocity_min = 0.6
+	p.initial_velocity_max = 1.1
+	p.scale_amount_min = 0.6
+	p.scale_amount_max = 1.2
+	var fade := Gradient.new()
+	fade.offsets = PackedFloat32Array([0.0, 0.1, 0.85, 1.0])
+	fade.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 0.9), Color(1, 1, 1, 0.9), Color(1, 1, 1, 0)])
+	p.color_ramp = fade
+	var mesh := QuadMesh.new()
+	mesh.size = Vector2(0.14, 0.14)
+	p.mesh = mesh
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	p.material_override = _glow_material(Color("#eef4ff"), 1.6)
+	return p
+
+
+## Дождь: тонкие голубоватые штрихи быстро падают наискось; без свечения, чуть прозрачные.
+static func rain() -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	p.name = "Rain"
+	p.amount = int(160 * budget())
+	p.lifetime = 1.1
+	p.preprocess = 1.1
+	p.randomness = 0.3
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	p.emission_box_extents = Vector3(18, 0.5, 14)
+	p.direction = Vector3(0.25, -1.0, 0.1)
+	p.spread = 3.0
+	p.gravity = Vector3(0, -4.0, 0)
+	p.initial_velocity_min = 11.0
+	p.initial_velocity_max = 14.0
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(0.025, 0.55, 0.025)
+	p.mesh = mesh
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color = Color(0.75, 0.85, 1.0, 0.38)
+	p.material_override = material
+	return p
+
+
+## Пепел: серые хлопья и редкие тлеющие угольки медленно кружат и оседают.
+static func ash() -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	p.name = "Ash"
+	p.amount = int(50 * budget())
+	p.lifetime = 9.0
+	p.preprocess = 9.0
+	p.randomness = 0.7
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	p.emission_box_extents = Vector3(17, 2.0, 13)
+	p.direction = Vector3(0.6, -0.3, 0.2)
+	p.spread = 60.0
+	p.gravity = Vector3(0, -0.12, 0)
+	p.initial_velocity_min = 0.2
+	p.initial_velocity_max = 0.6
+	p.scale_amount_min = 0.5
+	p.scale_amount_max = 1.1
+	var palette := Gradient.new()
+	palette.offsets = PackedFloat32Array([0.0, 0.7, 0.85, 1.0])
+	palette.colors = PackedColorArray([Color("#6a6a6a"), Color("#8a8580"), Color("#ff7a2a"), Color("#ffb060")])
+	p.color_initial_ramp = palette
+	var fade := Gradient.new()
+	fade.offsets = PackedFloat32Array([0.0, 0.15, 0.8, 1.0])
+	fade.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 0.85), Color(1, 1, 1, 0.85), Color(1, 1, 1, 0)])
+	p.color_ramp = fade
+	var mesh := QuadMesh.new()
+	mesh.size = Vector2(0.12, 0.12)
+	p.mesh = mesh
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	p.material_override = _glow_material(Color.WHITE, 1.2)
+	return p
+
+
+## Клочья тумана: большие полупрозрачные пятна у самой земли, медленно плывут и тают.
+static func wisps() -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	p.name = "Wisps"
+	p.amount = int(12 * budget())
+	p.lifetime = 14.0
+	p.preprocess = 14.0
+	p.randomness = 0.8
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	p.emission_box_extents = Vector3(17, 0.3, 13)
+	p.direction = Vector3(1, 0, 0.2)
+	p.spread = 180.0
+	p.gravity = Vector3.ZERO
+	p.initial_velocity_min = 0.15
+	p.initial_velocity_max = 0.45
+	p.scale_amount_min = 0.8
+	p.scale_amount_max = 1.6
+	var fade := Gradient.new()
+	fade.offsets = PackedFloat32Array([0.0, 0.3, 0.7, 1.0])
+	fade.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 0.16), Color(1, 1, 1, 0.16), Color(1, 1, 1, 0)])
+	p.color_ramp = fade
+	var mesh := QuadMesh.new()
+	mesh.size = Vector2(5.0, 2.6)
+	p.mesh = mesh
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	material.vertex_color_use_as_albedo = true
+	material.albedo_color = Color("#aab4c8")
+	material.albedo_texture = dot_texture()
+	material.no_depth_test = false
+	p.material_override = material
 	return p

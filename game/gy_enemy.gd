@@ -1,12 +1,16 @@
 extends CharacterBody3D
 
-## Враг «Кладбища»: зомби, скелет, призрак, вампир и их сильные подкрашенные варианты (гуль, рыцарь-скелет,
-## жнец) на моделях Graveyard Kit. Идёт к герою по прямой, обходя препятствия скольжением; призрак проходит
-## сквозь всё и парит. Рядом с героем замахивается (руки вверх, 0,28 с), потом делает выпад и бьёт
+## Враг «Кладбища»: зомби, скелет, призрак, вампир и их подкрашенные варианты (гуль, рыцарь-скелет, жнец,
+## мерзляк, болотник, горящий, боссы карт) на моделях Graveyard Kit, а также одержимые жители и староста —
+## блочные человечки Kenney со скином (model: character). Идёт к герою по прямой, обходя препятствия
+## скольжением; призрак проходит сквозь всё и парит. На льду буксует, в грязи вязнет (game.world.speed_factor),
+## если не immune к этой луже; призраки парят над лужами. Рядом с героем замахивается (руки вверх, 0,28 с), потом делает выпад и бьёт
 ## (player.take_damage, искры и звук удара). От снаряда вздрагивает (сжимается), при нуле здоровья зовёт game.on_enemy_died()
 ## и исчезает. Создаётся кодом: gy_game.gd зовёт setup(kind, stats, game) до добавления в дерево.
 
 const MODELS := "res://assets/kenney/graveyard/models/"
+const CHARACTER := "res://assets/kenney/characters/basicCharacter.gltf"
+const SKIN_DIR := "res://assets/kenney/characters/skins/"
 const GRAVITY := 20.0
 
 var kind := "zombie"
@@ -21,9 +25,11 @@ var is_elite := false
 var is_guard := false  # сторож реликвии: кружит вокруг неё, бьёт на полжизни
 var guard_target: Node3D = null
 var title := ""
+var immune: Array = []  # лужи, которые не замедляют (ice, mud)
 var game: Node = null
 
 static var _tinted := {}  # кэш подкрашенных материалов: ключ «вид:материал»
+static var _skins := {}  # кэш материалов человечков: ключ «скин:подкраска»
 
 var _model: Node3D
 var _arms: Array = []
@@ -37,6 +43,9 @@ var _light_color := ""
 var _windup := 0.0
 var _lunge := 0.0
 var _orbit := 0.0
+var _model_scale := 1.0
+var _skin := ""
+var _slowed := 0.0
 
 
 func setup(enemy_kind: String, stats: Dictionary, owner_game: Node) -> void:
@@ -54,8 +63,15 @@ func setup(enemy_kind: String, stats: Dictionary, owner_game: Node) -> void:
 	is_guard = bool(stats.get("guard", false))
 	title = str(stats.get("title", enemy_kind))
 	_model_name = str(stats.get("model", enemy_kind))
+	_model_scale = float(stats.get("model_scale", _size))
 	_tint = str(stats.get("tint", ""))
 	_light_color = str(stats.get("light", ""))
+	immune = stats.get("immune", [])
+	if is_ghost:
+		immune = ["ice", "mud"]
+	if stats.has("skins"):
+		var skins: Array = stats["skins"]
+		_skin = str(skins[randi_range(0, skins.size() - 1)])
 	_anim = randf_range(0, TAU)
 
 
@@ -70,22 +86,33 @@ func _ready() -> void:
 	shape.shape = capsule
 	shape.position = Vector3(0, 0.4 * _size, 0)
 	add_child(shape)
-	var path := MODELS + _model_name + ".glb"
+	var path := CHARACTER if _model_name == "character" else MODELS + _model_name + ".glb"
 	if ResourceLoader.exists(path):
 		_model = (load(path) as PackedScene).instantiate()
 	else:
 		push_warning("Враг: нет модели %s" % path)
 		_model = Node3D.new()
-	_model.scale = Vector3.ONE * _size
+	_model.scale = Vector3.ONE * _model_scale
 	add_child(_model)
 	var box: AABB = game.model_aabb(_model)
 	if box.size != Vector3.ZERO:
 		_model.position.y -= box.position.y - global_position.y
-	if _tint != "":
+	if _model_name == "character":
+		_apply_skin()
+	elif _tint != "":
 		_apply_tint(Color(_tint))
-	for arm_name in ["armLeft", "armRight"]:
+	for arm_name in ["armLeft", "armRight", "ArmLeft1", "ArmRight1"]:
 		var arm := _model.find_child(arm_name, true, false)
 		if arm != null:
+			if _model_name == "character":
+				# У человечка плечо не в начале координат руки: подвешиваем руку на шарнир в плече.
+				var joint := Vector3(3, 12, 0) if arm_name == "ArmLeft1" else Vector3(-3, 12, 0)
+				var pivot := Node3D.new()
+				pivot.position = joint
+				arm.get_parent().add_child(pivot)
+				arm.reparent(pivot, false)
+				arm.position = -joint
+				arm = pivot
 			_arms.append(arm)
 	if game.test_options.has("debug") and game.enemies.size() < 2:
 		var names: Array = []
@@ -99,6 +126,23 @@ func _ready() -> void:
 		light.omni_range = 4.5
 		light.position = Vector3(0, 0.9 * _size, 0)
 		add_child(light)
+
+
+## Человечек Kenney: одна картинка-скин на все части, подкраска затемняет (одержимые серые).
+func _apply_skin() -> void:
+	var key := "%s:%s" % [_skin, _tint]
+	if not _skins.has(key):
+		var material := StandardMaterial3D.new()
+		material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		material.roughness = 1.0
+		var path := SKIN_DIR + "skin_" + _skin + ".png"
+		if ResourceLoader.exists(path):
+			material.albedo_texture = load(path)
+		if _tint != "":
+			material.albedo_color = Color(_tint)
+		_skins[key] = material
+	for mesh in _model.find_children("*", "MeshInstance3D", true, false):
+		mesh.material_override = _skins[key]
 
 
 ## Подкраска модели: у каждой поверхности копия материала с albedo_color = tint (текстура остаётся).
@@ -139,8 +183,13 @@ func _physics_process(delta: float) -> void:
 	var dir := to / dist if dist > 0.001 else Vector3.ZERO
 	if not chasing and dist < 0.3:
 		dir = Vector3.ZERO
-	velocity.x = dir.x * speed
-	velocity.z = dir.z * speed
+	var factor := 1.0
+	var world: Node = game.get("world")
+	if world != null:
+		factor = world.speed_factor(global_position, "enemy", immune)
+	_slowed = lerpf(_slowed, 1.0 - factor, 1.0 - exp(-6.0 * delta))
+	velocity.x = dir.x * speed * factor
+	velocity.z = dir.z * speed * factor
 	if _windup > 0.0 or _lunge > 0.0:
 		velocity.x = 0.0  # во время замаха и выпада стоит на месте
 		velocity.z = 0.0
@@ -183,12 +232,14 @@ func _physics_process(delta: float) -> void:
 		for i in _arms.size():
 			_arms[i].rotation.x = -0.6 + swing * (1.0 if i == 0 else -1.0)
 	_model.position.z = forward
+	# На скользкой луже тварь буксует: покачивается из стороны в сторону.
+	_model.rotation.z = sin(_anim * 9.0) * 0.22 * _slowed
 	if _hit > 0.0:
 		_hit -= delta
 		var squash := 1.0 - 0.25 * clampf(_hit / 0.12, 0.0, 1.0)
-		_model.scale = Vector3(_size * (2.0 - squash), _size * squash, _size * (2.0 - squash))
+		_model.scale = Vector3(_model_scale * (2.0 - squash), _model_scale * squash, _model_scale * (2.0 - squash))
 	else:
-		_model.scale = Vector3.ONE * _size
+		_model.scale = Vector3.ONE * _model_scale
 
 
 ## Удар по герою: урон, искры и звук; герой 0,4 с неуязвим, поэтому толпа не бьёт десять раз за кадр.
