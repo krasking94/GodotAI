@@ -43,6 +43,11 @@ var _shop_focus := 0
 var _shop_count := 0
 var _auto_timer := 0.0
 var _combo_label: Label
+var _hint_panel: PanelContainer
+var _hint_label: Label
+var _hint_timer := 0.0
+var hint_text := ""  # текущая подсказка обучения ("" — скрыта)
+var _help_panel: PanelContainer
 var _slots_box: HBoxContainer
 var _slots: Array = []  # [PanelContainer, AbilityIcon, Label название, Label секунды, id]
 
@@ -117,6 +122,8 @@ func _ready() -> void:
 	_xp_bar.offset_bottom = -12
 	add_child(_xp_bar)
 	_build_slots()
+	_build_hint()
+	_build_help()
 	_banner = _make_label(34)
 	_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_banner.grow_horizontal = Control.GROW_DIRECTION_BOTH
@@ -299,6 +306,7 @@ class AbilityIcon extends Control:
 ## Стрелка к реликвии под таймером: лиловый треугольник, повёрнутый в сторону реликвии.
 class RelicArrow extends Control:
 	var angle := 0.0
+	var color := Color("#c070ff")
 
 	func _draw() -> void:
 		var c := size * 0.5
@@ -306,7 +314,7 @@ class RelicArrow extends Control:
 		var points := PackedVector2Array()
 		for p in [Vector2(r, 0), Vector2(-r * 0.7, r * 0.6), Vector2(-r * 0.3, 0), Vector2(-r * 0.7, -r * 0.6)]:
 			points.append(c + p.rotated(angle))
-		draw_polygon(points, PackedColorArray([Color("#c070ff")]))
+		draw_polygon(points, PackedColorArray([color]))
 
 
 func _card_style(color: Color, focused: bool) -> StyleBoxFlat:
@@ -317,6 +325,80 @@ func _card_style(color: Color, focused: bool) -> StyleBoxFlat:
 	box.set_corner_radius_all(12)
 	box.set_content_margin_all(14)
 	return box
+
+
+## Подсказка обучения: тёмная плашка слева под полосой здоровья (gy_game.gd зовёт show_hint/hide_hint).
+func _build_hint() -> void:
+	_hint_panel = PanelContainer.new()
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.03, 0.04, 0.08, 0.86)
+	box.border_color = Color("#ffe08a")
+	box.set_border_width_all(2)
+	box.set_corner_radius_all(10)
+	box.set_content_margin_all(12)
+	_hint_panel.add_theme_stylebox_override("panel", box)
+	_hint_panel.position = Vector2(16, 108)
+	_hint_panel.custom_minimum_size = Vector2(470, 0)
+	_hint_panel.visible = false
+	add_child(_hint_panel)
+	_hint_label = _make_label(18)
+	_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_hint_label.custom_minimum_size = Vector2(440, 0)
+	_hint_panel.add_child(_hint_label)
+
+
+## Показать подсказку; seconds > 0 — исчезнет сама, 0 — висит до hide_hint().
+func show_hint(text: String, seconds: float = 0.0) -> void:
+	hint_text = text
+	_hint_label.text = "💡 " + text
+	_hint_panel.visible = true
+	_hint_timer = seconds
+
+
+func hide_hint() -> void:
+	hint_text = ""
+	_hint_panel.visible = false
+	_hint_timer = 0.0
+
+
+## Окно «Как играть» (H или F1): управление и правила одним экраном, игру не останавливает.
+func _build_help() -> void:
+	_help_panel = _panel()
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 6)
+	_help_panel.add_child(column)
+	var title := _make_label(30)
+	title.text = "Как играть"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", Color("#ffe08a"))
+	column.add_child(title)
+	var lines := [
+		"Форпост (база): W A S D — ходить · E — войти в здание · ворота на севере ведут в ночь",
+		"Алтарь — постоянная прокачка за души · Кузница — способности · Башня — укрепления · Костёр — герой",
+		"Ночью герой стреляет сам: твоё дело — бегать (W A S D) и не дать себя окружить",
+		"Синие огоньки — души: ночью это опыт, в форпосте — валюта. Тыквы лечат",
+		"1 2 3 4 — способности из слотов внизу (или щелчок мышью), у каждой своя перезарядка",
+		"Уровни растут сами. На вехах игра встаёт и даёт выбрать одно улучшение: ← → и Enter",
+		"Каждые 30 с — волна с одной стороны · кровавая минута — враги быстрее, опыт вдвое",
+		"Реликвия — пол-шкалы опыта, её сторожит быстрый скелет · продержись до конца таймера",
+	]
+	for line in lines:
+		var label := _make_label(18)
+		label.text = "• " + str(line)
+		column.add_child(label)
+	var hint := _make_label(16)
+	hint.text = "H — закрыть"
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.modulate = Color(1, 1, 1, 0.6)
+	column.add_child(hint)
+	_help_panel.visible = false
+	add_child(_help_panel)
+
+
+func toggle_help() -> void:
+	_help_panel.visible = not _help_panel.visible
+	if _help_panel.visible:
+		hide_hint()  # подсказка обучения вернётся сама, когда окно закроют
 
 
 func _slot_style(color: Color, ready: bool) -> StyleBoxFlat:
@@ -514,7 +596,7 @@ func _build_menu() -> void:
 	start.add_theme_color_override("font_color", Color("#ffe0a0"))
 	column.add_child(start)
 	_menu_hint = _make_label(16)
-	_menu_hint.text = "В форпосте: стрелки или WASD — ходить, E у здания — войти, ворота ведут в ночь\nНочью герой стреляет сам, 1 2 3 — прокачка на новом уровне"
+	_menu_hint.text = "В форпосте: W A S D — ходить, E у здания — войти, ворота ведут в ночь\nНочью герой стреляет сам, 1–4 — способности, на вехах выбираешь улучшение · H — как играть"
 	_menu_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_menu_hint.modulate = Color(1, 1, 1, 0.65)
 	column.add_child(_menu_hint)
@@ -597,6 +679,8 @@ func _set_shop_focus(index: int) -> void:
 
 
 func show_shop(title: String, rows: Array, hint: String, selected: int) -> void:
+	hide_hint()
+	_help_panel.visible = false
 	_shop_title.text = title
 	_shop_hint.text = hint
 	_shop_count = mini(rows.size(), _shop_rows.size())
@@ -628,6 +712,10 @@ func hide_shop() -> void:
 
 
 func _process(delta: float) -> void:
+	if _hint_timer > 0.0:
+		_hint_timer -= delta
+		if _hint_timer <= 0.0:
+			hide_hint()
 	if _banner_timer > 0.0:
 		_banner_timer -= delta
 		if _banner_timer <= 0.0:
@@ -646,6 +734,9 @@ func _input(event: InputEvent) -> void:
 		return
 	var key: int = event.physical_keycode
 	var state := str(game.get("state"))
+	if (key == KEY_H or key == KEY_F1) and (state == "playing" or state == "base" or state == "menu"):
+		toggle_help()
+		return
 	match state:
 		"playing":
 			if key == KEY_1 or key == KEY_KP_1:
@@ -704,12 +795,19 @@ func set_values(hp: float, max_hp: float, xp: int, xp_needed: int, level: int, t
 
 ## Стрелка и расстояние до реликвии (angle в экранных осях: 0 — вправо, вниз — положительный).
 func set_relic(shown: bool, angle: float, distance: float) -> void:
+	set_guide(shown, angle, "Реликвия: %d м" % int(distance), Color("#c070ff"))
+
+
+## Стрелка-проводник под таймером (обучение в форпосте: к воротам, к алтарю) — та же стрелка, что у реликвии.
+func set_guide(shown: bool, angle: float, text: String, color: Color) -> void:
 	_relic_arrow.visible = shown
 	_relic_label.visible = shown
 	if shown:
 		_relic_arrow.angle = angle
+		_relic_arrow.color = color
 		_relic_arrow.queue_redraw()
-		_relic_label.text = "Реликвия: %d м" % int(distance)
+		_relic_label.text = text
+		_relic_label.add_theme_color_override("font_color", color)
 
 
 func flash() -> void:
@@ -733,13 +831,15 @@ func set_combo(count: int, _fraction: float) -> void:
 
 
 func show_message(text: String) -> void:
+	hide_hint()
+	set_guide(false, 0.0, "", Color.WHITE)
 	_message.text = text
 	_message.visible = true
 	print("Надпись на экране: %s" % text.replace("\n", " "))
 
 
 func show_levelup(options: Array, level: int, recommended: int = 0) -> void:
-	_levelup_title.text = "Уровень %d! Выбери прокачку" % level
+	_levelup_title.text = "Веха — уровень %d. Выбери одно улучшение" % level
 	_levelup_count = mini(options.size(), _levelup_cards.size())
 	for i in _levelup_cards.size():
 		var card: PanelContainer = _levelup_cards[i][0]
