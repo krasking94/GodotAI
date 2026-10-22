@@ -32,6 +32,7 @@ var _model: Node3D
 var _limbs := {}
 var _material: StandardMaterial3D
 var _fire_timer := 0.5
+var _step_timer := 0.0
 var _hurt_timer := 0.0
 var _flash := 0.0
 var _anim := 0.0
@@ -104,6 +105,10 @@ func _physics_process(delta: float) -> void:
 	global_position.z = clampf(global_position.z, -limit, limit)
 	if dir.length() > 0.1:
 		_facing = atan2(dir.x, dir.z)
+		_step_timer -= delta
+		if _step_timer <= 0.0 and is_on_floor():
+			_step_timer = 0.32
+			game.play_random("step", 4)
 	_model.rotation.y = lerp_angle(_model.rotation.y, _facing, 1.0 - exp(-12.0 * delta))
 	_animate(dir.length(), delta)
 	if regen > 0.0 and hp < max_hp:

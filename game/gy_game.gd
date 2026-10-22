@@ -18,17 +18,25 @@ extends Node3D
 
 const MODELS := "res://assets/kenney/graveyard/models/"
 const SOUNDS := "res://assets/kenney/graveyard/sounds/"
-const SOUND_NAMES := ["bolt", "hit", "die", "hurt", "pickup", "levelup", "win", "over", "boss", "click", "swing"]
-const SOUND_VOLUME := {"bolt": -14.0, "hit": -8.0, "die": -6.0, "swing": -8.0, "pickup": -6.0}
+const SOUND_NAMES := ["bolt", "hit", "die", "hurt", "pickup", "levelup", "win", "over", "boss", "click", "swing",
+	"die_zombie", "die_skeleton", "die_ghost", "die_elite", "punch", "windup", "soul", "heal", "relic", "alert", "elite",
+	"hover", "select", "step0", "step1", "step2", "step3"]
+const SOUND_VOLUME := {"bolt": -14.0, "hit": -8.0, "die": -6.0, "swing": -8.0, "pickup": -6.0, "die_zombie": -6.0,
+	"die_skeleton": -8.0, "die_ghost": -8.0, "die_elite": -2.0, "punch": -5.0, "windup": -12.0, "soul": -12.0, "heal": -4.0,
+	"alert": -2.0, "elite": -4.0, "hover": -14.0, "select": -6.0, "step0": -18.0, "step1": -18.0, "step2": -18.0, "step3": -18.0}
 const SKINS := ["adventurer", "man", "woman", "soldier", "robot", "orc", "manAlternative", "womanAlternative"]
 const SKIN_TITLES := {"adventurer": "Путешественник", "man": "Горожанин", "woman": "Горожанка", "soldier": "Солдат",
 	"robot": "Робот", "orc": "Орк", "manAlternative": "Учёный", "womanAlternative": "Байкерша"}
 const ENEMY_KINDS := {
-	# scale — множитель модели: фигурки Graveyard Kit ростом около 0,8 м, зомби делаем 1,4 м, вампира 2,6 м.
-	"zombie": {"hp": 30.0, "speed": 1.7, "damage": 10.0, "xp": 2, "scale": 1.8, "from": 0.0, "weight": 3.0},
-	"skeleton": {"hp": 14.0, "speed": 3.0, "damage": 6.0, "xp": 2, "scale": 1.7, "from": 30.0, "weight": 2.0},
-	"ghost": {"hp": 22.0, "speed": 2.3, "damage": 8.0, "xp": 3, "scale": 1.6, "from": 60.0, "weight": 2.0, "ghost": true},
-	"vampire": {"hp": 700.0, "speed": 2.4, "damage": 25.0, "xp": 60, "scale": 3.2, "from": 0.0, "weight": 0.0, "boss": true},
+	# model — файл модели, tint — подкраска модели, xp — сколько опыта даёт, from — с какой секунды приходит,
+	# weight — как часто выпадает, elite — редкий сильный враг с большим опытом (объявляется на табло).
+	"zombie": {"model": "zombie", "title": "Зомби", "hp": 30.0, "speed": 1.7, "damage": 10.0, "xp": 1, "scale": 1.8, "from": 0.0, "weight": 3.0},
+	"skeleton": {"model": "skeleton", "title": "Скелет", "hp": 14.0, "speed": 3.0, "damage": 6.0, "xp": 2, "scale": 1.7, "from": 30.0, "weight": 2.0},
+	"ghost": {"model": "ghost", "title": "Призрак", "hp": 22.0, "speed": 2.3, "damage": 8.0, "xp": 3, "scale": 1.6, "from": 60.0, "weight": 2.0, "ghost": true},
+	"ghoul": {"model": "zombie", "title": "Гуль", "tint": "#6f9a4a", "hp": 90.0, "speed": 1.3, "damage": 18.0, "xp": 10, "scale": 2.4, "from": 45.0, "weight": 0.7, "elite": true},
+	"knight": {"model": "skeleton", "title": "Рыцарь-скелет", "tint": "#a9bddb", "hp": 60.0, "speed": 2.4, "damage": 12.0, "xp": 8, "scale": 2.0, "from": 75.0, "weight": 0.7, "elite": true},
+	"wraith": {"model": "ghost", "title": "Жнец", "tint": "#c070ff", "hp": 45.0, "speed": 3.4, "damage": 10.0, "xp": 15, "scale": 2.0, "from": 100.0, "weight": 0.45, "ghost": true, "elite": true, "light": "#b060ff"},
+	"vampire": {"model": "vampire", "title": "Вампир", "hp": 700.0, "speed": 2.4, "damage": 25.0, "xp": 60, "scale": 3.2, "from": 0.0, "weight": 0.0, "boss": true, "light": "#ff3a3a"},
 }
 const UPGRADES := [
 	{"id": "damage", "title": "Сила удара", "text": "Урон снарядов +30%"},
@@ -71,7 +79,7 @@ var bolts_root: Node3D
 
 const Fx := preload("res://game/gy_fx.gd")
 ## Цвет искр, которыми рассыпается погибший враг.
-const DEATH_COLORS := {"zombie": "#7cff5a", "skeleton": "#ffffff", "ghost": "#8ad8ff", "vampire": "#ff3a3a"}
+const DEATH_COLORS := {"zombie": "#7cff5a", "skeleton": "#ffffff", "ghost": "#8ad8ff", "ghoul": "#a6ff3a", "knight": "#cfe4ff", "wraith": "#d08cff", "vampire": "#ff3a3a"}
 
 var _spawn_budget := 0.0
 var _report_every := 0.0
@@ -90,6 +98,7 @@ var hold_levelup := false  # окно прокачки не закрывать �
 var _fires: Array = []  # [OmniLight3D, фаза] для мерцания
 var _soul_material: StandardMaterial3D
 var _solid_spots: Array = []  # Vector2 занятых мест, чтобы украшения не лезли друг в друга
+var _seen_kinds := {}  # какие виды врагов уже объявлялись на табло
 var _fx_root: Node3D
 var _fireflies: CPUParticles3D
 var _leaves: CPUParticles3D
@@ -248,6 +257,11 @@ func _setup_sounds() -> void:
 func play_sound(sound_name: String) -> void:
 	if _sounds.has(sound_name):
 		_sounds[sound_name].play()
+
+
+## Один из нескольких похожих звуков (шаги): prefix0 … prefix(count-1).
+func play_random(prefix: String, count: int) -> void:
+	play_sound(prefix + str(_rng.randi_range(0, count - 1)))
 
 
 # --- Кладбище: ограда, надгробия, склепы, сосны, фонари ---
@@ -511,6 +525,13 @@ func _spawn_enemy(kind: String) -> void:
 	_enemies_root.add_child(enemy)
 	enemy.global_position = pos
 	enemies.append(enemy)
+	var stats: Dictionary = ENEMY_KINDS[kind]
+	if bool(stats.get("elite", false)) and not _seen_kinds.has(kind):
+		_seen_kinds[kind] = true
+		play_sound("elite")
+		if hud != null:
+			hud.show_banner("Новый враг: %s (+%d опыта)" % [str(stats["title"]), int(stats["xp"])])
+		print("Новый враг: %s на %d с" % [str(stats["title"]), int(elapsed)])
 
 
 func on_enemy_died(enemy: Node3D) -> void:
@@ -527,7 +548,12 @@ func on_enemy_died(enemy: Node3D) -> void:
 		print("Вампир повержен на %d с" % int(elapsed))
 	elif _rng.randf() < 0.07:
 		_spawn_soul(pos + Vector3(0.6, 0, 0), 0, "pumpkin")
-	play_sound("die")
+	if enemy.is_boss:
+		pass
+	elif enemy.is_elite:
+		play_sound("die_elite")
+	else:
+		play_sound("die_" + str(ENEMY_KINDS[enemy.kind].get("model", "zombie")))
 
 
 func _spawn_soul(pos: Vector3, value: int, kind: String) -> void:
@@ -583,10 +609,11 @@ func _collect(soul: Node3D) -> void:
 	var kind := str(soul.get_meta("kind"))
 	if kind == "pumpkin":
 		player.heal(25.0)
+		play_sound("heal")
 		print("Тыква: лечение, здоровье %d" % int(player.hp))
 	else:
 		_gain_xp(int(soul.get_meta("value")))
-	play_sound("pickup")
+		play_sound("soul")
 	soul.queue_free()
 
 
@@ -595,7 +622,7 @@ func _gain_xp(amount: int) -> void:
 	if xp >= xp_needed:
 		xp -= xp_needed
 		level += 1
-		xp_needed = 5 + level * 3
+		xp_needed = 4 + level * 2
 		_level_up()
 
 
@@ -667,7 +694,7 @@ func choose_upgrade(index: int) -> void:
 		"regen":
 			player.regen += 1.0
 	print("Прокачка: %s" % str(upgrade["title"]))
-	play_sound("click")
+	play_sound("select")
 	if hud != null:
 		hud.hide_levelup()
 	get_tree().paused = false

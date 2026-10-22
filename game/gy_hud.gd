@@ -255,7 +255,10 @@ func _build_levelup() -> void:
 func _set_levelup_focus(index: int) -> void:
 	if _levelup_count <= 0:
 		return
-	_levelup_focus = wrapi(index, 0, _levelup_count)
+	var new_focus := wrapi(index, 0, _levelup_count)
+	if _levelup_panel.visible and new_focus != _levelup_focus and game != null:
+		game.play_sound("hover")
+	_levelup_focus = new_focus
 	for i in _levelup_cards.size():
 		var card: PanelContainer = _levelup_cards[i][0]
 		var icon: UpgradeIcon = _levelup_cards[i][1]
