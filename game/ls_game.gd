@@ -18,7 +18,7 @@ extends Node3D
 ## auto — автопилот: закрывает предисловие, ходит к целям, нажимает E, в мини-играх отвечает верно;
 ## quest:N — начать сразу с задания N (0..); seconds — сколько секунд идёт проверка; report — как часто
 ## печатать «Жизнь [t с]: …»; quit — выйти после конца этапа или по истечении seconds; intro:0 — без предисловия;
-## lamp:1 — открыть лампочку (для снимка); look:x:z — повернуть малыша к точке.
+## lamp:1 — открыть лампочку (для снимка); look:x:z — повернуть малыша к точке; spin:1 — крутить мышью (проверка обзора).
 
 const FURNITURE := "res://assets/kenney/furniture/"
 const FOOD := "res://assets/kenney/food/"
@@ -1121,9 +1121,16 @@ func _test_tick(delta: float) -> void:
 			_report_time -= report
 			print("Жизнь [%d с]: задание %d (%s), режим %s, позиция %s, навыки %s, возраст %d мес." % [int(_test_time), quest_index + 1,
 				str(current_quest().get("id", "конец")), _player.mode, _player.global_position.snapped(Vector3(0.1, 0.1, 0.1)), _skills_text(), months])
+			if _test.get("spin", "0") == "1":
+				print("  поворот головы: %.0f°, мышь захвачена=%s" % [rad_to_deg(_player.rotation.y), Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED])
 			if _test.get("debug", "0") == "1":
 				print("  автопилот: goto=%s путь=%s равновесие=%.2f скорость=%s ui=%s ждать=%.1f" % [_player._goto_active, _auto_path, _player.balance,
 					_player.get_real_velocity().snapped(Vector3(0.01, 0.01, 0.01)), _hud.ui_open, _auto_wait])
+	if _test.get("spin", "0") == "1":
+		# Проверка обзора мышью: подаём движение мыши как настоящее событие, в отчёте печатается поворот.
+		var motion := InputEventMouseMotion.new()
+		motion.relative = Vector2(12, 0)
+		Input.parse_input_event(motion)
 	if _test.has("seconds") and _test_time >= float(_test["seconds"]):
 		print("Жизнь: проверка окончена по времени; задание %d, навыки %s" % [quest_index + 1, _skills_text()])
 		if _test.get("quit", "0") == "1":

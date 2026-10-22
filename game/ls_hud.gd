@@ -94,6 +94,7 @@ func _label(size: int, color := Color.WHITE) -> Label:
 func _build_top_left() -> void:
 	var panel := PanelContainer.new()
 	panel.name = "QuestPanel"
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_theme_stylebox_override("panel", _panel_style(Color(0.08, 0.1, 0.16, 0.72)))
 	panel.position = Vector2(20, 20)
 	panel.custom_minimum_size = Vector2(420, 0)
@@ -115,6 +116,7 @@ func _build_top_right() -> void:
 	var panel := PanelContainer.new()
 	_skill_panel = panel
 	panel.name = "SkillPanel"
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_theme_stylebox_override("panel", _panel_style(Color(0.08, 0.1, 0.16, 0.72)))
 	panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	panel.anchor_left = 1.0
@@ -174,6 +176,7 @@ func _build_bottom() -> void:
 	add_child(_hint)
 	# Прицел: точка в центре, чтобы было понятно, куда смотришь.
 	var dot := ColorRect.new()
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE  # прицел не должен перехватывать мышь
 	dot.color = Color(1, 1, 1, 0.7)
 	dot.set_anchors_preset(Control.PRESET_CENTER)
 	dot.offset_left = -3
