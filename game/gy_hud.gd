@@ -42,6 +42,7 @@ var _shop_rows: Array = []  # [PanelContainer, Label слева, Label спра�
 var _shop_focus := 0
 var _shop_count := 0
 var _auto_timer := 0.0
+var _combo_label: Label
 var _slots_box: HBoxContainer
 var _slots: Array = []  # [PanelContainer, AbilityIcon, Label название, Label секунды, id]
 
@@ -65,6 +66,11 @@ func _ready() -> void:
 	_map_label.position = Vector2(18, 44)
 	_map_label.modulate = Color(1, 1, 1, 0.8)
 	add_child(_map_label)
+	_combo_label = _make_label(24)
+	_combo_label.position = Vector2(18, 70)
+	_combo_label.modulate = Color("#ffe08a")
+	_combo_label.visible = false
+	add_child(_combo_label)
 	_souls_label = _make_label(22)
 	_souls_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	_souls_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
@@ -114,7 +120,7 @@ func _ready() -> void:
 	_banner = _make_label(34)
 	_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_banner.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_banner.offset_top = 64
+	_banner.offset_top = 128  # ниже стрелки и подписи реликвии
 	_banner.add_theme_color_override("font_color", Color("#ffb347"))
 	_banner.visible = false
 	add_child(_banner)
@@ -710,10 +716,20 @@ func flash() -> void:
 	_flash_rect.color.a = 0.22
 
 
-func show_banner(text: String) -> void:
+func show_banner(text: String, color: String = "#ffb347") -> void:
 	_banner.text = text
+	_banner.add_theme_color_override("font_color", Color(color))
 	_banner.visible = true
 	_banner_timer = 3.0
+
+
+## Серия убийств слева под названием карты: видна от трёх подряд, растёт и ярчает.
+func set_combo(count: int, _fraction: float) -> void:
+	_combo_label.visible = count >= 3 and _xp_bar.visible
+	if count >= 3:
+		_combo_label.text = "Серия ×%d" % count
+		_combo_label.add_theme_font_size_override("font_size", mini(24 + count / 2, 40))
+		_combo_label.modulate = Color("#ff6a3a") if count >= 25 else (Color("#ffb347") if count >= 10 else Color("#ffe08a"))
 
 
 func show_message(text: String) -> void:
@@ -775,6 +791,7 @@ func _set_hud_visible(shown: bool) -> void:
 	_souls_label.visible = shown
 	if not shown:
 		_slots_box.visible = false
+		_combo_label.visible = false
 
 
 func hide_menu() -> void:

@@ -39,6 +39,8 @@ const DEFAULT := {
 		"ghoul": {"weight": 0.7, "from": 45.0},
 		"knight": {"weight": 0.7, "from": 75.0},
 		"wraith": {"weight": 0.45, "from": 100.0},
+		"hound": {"weight": 1.0, "from": 90.0},
+		"bomber": {"weight": 0.5, "from": 120.0},
 	},
 }
 
@@ -91,6 +93,8 @@ const MAPS := [
 			"ghost": {"weight": 2.0, "from": 40.0},
 			"ghoul": {"weight": 0.8, "from": 50.0},
 			"wraith": {"weight": 0.4, "from": 110.0},
+			"bomber": {"weight": 0.6, "from": 90.0},
+			"brute": {"weight": 0.3, "from": 140.0},
 		},
 	},
 	{
@@ -115,6 +119,8 @@ const MAPS := [
 			"ghost": {"weight": 1.5, "from": 50.0},
 			"knight": {"weight": 0.8, "from": 60.0},
 			"wraith": {"weight": 0.4, "from": 120.0},
+			"hound": {"weight": 1.2, "from": 50.0},
+			"brute": {"weight": 0.3, "from": 130.0},
 		},
 	},
 	{
@@ -139,6 +145,8 @@ const MAPS := [
 			"skeleton": {"weight": 1.5, "from": 45.0},
 			"ghost": {"weight": 1.2, "from": 70.0},
 			"knight": {"weight": 0.7, "from": 90.0},
+			"bomber": {"weight": 0.7, "from": 60.0},
+			"brute": {"weight": 0.4, "from": 120.0},
 		},
 	},
 	{
@@ -163,6 +171,8 @@ const MAPS := [
 			"skeleton": {"weight": 1.5, "from": 40.0},
 			"wraith": {"weight": 0.8, "from": 60.0},
 			"ghoul": {"weight": 0.6, "from": 90.0},
+			"hound": {"weight": 1.5, "from": 25.0},
+			"brute": {"weight": 0.4, "from": 100.0},
 		},
 	},
 	{
@@ -188,6 +198,9 @@ const MAPS := [
 			"ghoul": {"weight": 1.0, "from": 30.0},
 			"knight": {"weight": 1.0, "from": 60.0},
 			"wraith": {"weight": 0.6, "from": 90.0},
+			"hound": {"weight": 1.2, "from": 20.0},
+			"bomber": {"weight": 0.8, "from": 40.0},
+			"brute": {"weight": 0.5, "from": 90.0},
 		},
 	},
 	{
@@ -213,6 +226,8 @@ const MAPS := [
 			"burning": {"weight": 1.6, "from": 30.0},
 			"ghost": {"weight": 1.2, "from": 60.0},
 			"ghoul": {"weight": 0.8, "from": 70.0},
+			"bomber": {"weight": 0.8, "from": 50.0},
+			"hound": {"weight": 1.0, "from": 80.0},
 		},
 	},
 	{
@@ -237,6 +252,8 @@ const MAPS := [
 			"ghoul": {"weight": 1.2, "from": 25.0},
 			"knight": {"weight": 1.0, "from": 70.0},
 			"ghost": {"weight": 1.0, "from": 90.0},
+			"hound": {"weight": 1.4, "from": 30.0},
+			"brute": {"weight": 0.5, "from": 110.0},
 		},
 	},
 	{
@@ -261,6 +278,8 @@ const MAPS := [
 			"zombie": {"weight": 1.5, "from": 0.0},
 			"ghost": {"weight": 1.0, "from": 60.0},
 			"wraith": {"weight": 0.6, "from": 100.0},
+			"brute": {"weight": 0.6, "from": 60.0},
+			"bomber": {"weight": 0.7, "from": 80.0},
 		},
 	},
 	{
@@ -288,6 +307,9 @@ const MAPS := [
 			"knight": {"weight": 1.0, "from": 45.0},
 			"wraith": {"weight": 0.8, "from": 60.0},
 			"burning": {"weight": 0.8, "from": 80.0},
+			"hound": {"weight": 1.2, "from": 20.0},
+			"bomber": {"weight": 0.9, "from": 50.0},
+			"brute": {"weight": 0.7, "from": 80.0},
 		},
 	},
 ]

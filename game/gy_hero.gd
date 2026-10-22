@@ -267,10 +267,14 @@ func take_damage(amount: float) -> void:
 		amount -= absorbed
 		if absorbed > 0.0:
 			game.spawn_burst(global_position + Vector3(0, 1.0, 0), Color("#6ad0ff"), 0.8)
+	if game.test_options.has("god"):
+		amount = 0.0  # самопроверка god:1: герой бессмертен, чтобы досмотреть приёмы боссов и волны
 	hp -= amount
 	_hurt_timer = 0.4
 	_flash = 0.15
 	game.play_sound("hurt")
+	if amount > 0.0 and game.has_method("shake"):
+		game.shake(0.3)
 	if game.hud != null and amount > 0.0:
 		game.hud.flash()
 	if hp <= 0.0:
