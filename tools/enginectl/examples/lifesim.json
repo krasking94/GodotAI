@@ -1,0 +1,17 @@
+{
+  "phrase": "Сделай симулятор жизни от первого лица: ты рождаешься в доме с мамой и папой, лежишь в кроватке, учишься ползать и ходить, говоришь первое слово, учишь буквы, собираешь игрушки, засыпаешь — и тебе три года, впереди садик.",
+  "scene": {
+    "path": "res://scenes/lifesim.tscn",
+    "root_type": "Node3D",
+    "root_name": "LifeSim"
+  },
+  "ops": [
+    {"op": "set", "path": ".", "props": {"script": "res://game/ls_game.gd"}},
+    {"op": "create", "parent": ".", "name": "Player", "type": "CharacterBody3D",
+      "props": {"position": [2, 0.5, 2], "script": "res://game/ls_player.gd"}},
+    {"op": "create", "parent": "Player", "name": "Shape", "type": "CollisionShape3D",
+      "props": {"shape": {"primitive": "capsule", "radius": 0.22, "height": 0.7}}},
+    {"op": "create", "parent": "Player", "name": "Camera", "type": "Camera3D", "props": {"position": [0, 0.45, 0]}},
+    {"op": "create", "parent": ".", "name": "Hud", "type": "CanvasLayer", "props": {"layer": 10, "script": "res://game/ls_hud.gd"}}
+  ]
+}

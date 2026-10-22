@@ -1,0 +1,26 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://game/ls_game.gd" id="1_game"]
+[ext_resource type="Script" path="res://game/ls_player.gd" id="2_player"]
+[ext_resource type="Script" path="res://game/ls_hud.gd" id="3_hud"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_baby"]
+radius = 0.22
+height = 0.7
+
+[node name="LifeSim" type="Node3D"]
+script = ExtResource("1_game")
+
+[node name="Player" type="CharacterBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.5, 2)
+script = ExtResource("2_player")
+
+[node name="Shape" type="CollisionShape3D" parent="Player"]
+shape = SubResource("CapsuleShape3D_baby")
+
+[node name="Camera" type="Camera3D" parent="Player"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+
+[node name="Hud" type="CanvasLayer" parent="."]
+layer = 10
+script = ExtResource("3_hud")
