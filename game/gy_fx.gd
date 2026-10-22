@@ -6,7 +6,7 @@ extends RefCounted
 
 static var _dot_texture: GradientTexture2D
 static var _leaf_texture: GradientTexture2D
-static var _spark_material: StandardMaterial3D
+static var _spark_materials := {}  # цвет → материал искр, чтобы не плодить материалы на каждый всплеск
 static var _spark_mesh: QuadMesh
 
 
@@ -127,37 +127,40 @@ static func leaves() -> CPUParticles3D:
 	return p
 
 
-## Искры от попадания: один всплеск из 14 точек, разлетаются во все стороны, падают, гаснут; сами удаляются.
-static func sparks() -> CPUParticles3D:
-	if _spark_material == null:
-		_spark_material = _glow_material(Color("#ffd27a"), 4.0)
+## Искры: один всплеск точек, разлетаются во все стороны, падают, гаснут; сами удаляются.
+## По умолчанию — горячие искры попадания; при гибели врага зовётся с его цветом и большим числом точек.
+static func sparks(color: Color = Color("#ffd27a"), amount: int = 14, size: float = 1.0) -> CPUParticles3D:
+	if _spark_mesh == null:
 		_spark_mesh = QuadMesh.new()
 		_spark_mesh.size = Vector2(0.14, 0.14)
+	var key := color.to_html(false)
+	if not _spark_materials.has(key):
+		_spark_materials[key] = _glow_material(color, 4.0)
 	var p := CPUParticles3D.new()
 	p.name = "Sparks"
-	p.amount = 14
-	p.lifetime = 0.45
+	p.amount = amount
+	p.lifetime = 0.45 + 0.15 * (size - 1.0)
 	p.one_shot = true
 	p.explosiveness = 1.0
 	p.randomness = 0.4
 	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-	p.emission_sphere_radius = 0.12
+	p.emission_sphere_radius = 0.12 * size
 	p.direction = Vector3(0, 1, 0)
 	p.spread = 180.0
 	p.gravity = Vector3(0, -9.0, 0)
-	p.initial_velocity_min = 2.5
-	p.initial_velocity_max = 6.0
+	p.initial_velocity_min = 2.5 * size
+	p.initial_velocity_max = 6.0 * size
 	p.damping_min = 1.0
 	p.damping_max = 3.0
-	p.scale_amount_min = 0.6
-	p.scale_amount_max = 1.1
+	p.scale_amount_min = 0.6 * size
+	p.scale_amount_max = 1.1 * size
 	var fade := Gradient.new()
 	fade.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
-	fade.colors = PackedColorArray([Color("#fff6d0"), Color("#ff9a2a"), Color(1, 0.4, 0.1, 0)])
+	fade.colors = PackedColorArray([Color.WHITE, color, Color(color.r, color.g, color.b, 0.0)])
 	p.color_ramp = fade
 	p.mesh = _spark_mesh
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	p.material_override = _spark_material
+	p.material_override = _spark_materials[key]
 	p.finished.connect(p.queue_free)
 	p.emitting = true
 	return p
