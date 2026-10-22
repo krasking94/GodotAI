@@ -70,6 +70,8 @@ var hud: CanvasLayer
 var bolts_root: Node3D
 
 const Fx := preload("res://game/gy_fx.gd")
+## Цвет искр, которыми рассыпается погибший враг.
+const DEATH_COLORS := {"zombie": "#7cff5a", "skeleton": "#ffffff", "ghost": "#8ad8ff", "vampire": "#ff3a3a"}
 
 var _spawn_budget := 0.0
 var _report_every := 0.0
@@ -277,6 +279,17 @@ func spawn_sparks(pos: Vector3) -> void:
 	sparks.global_position = pos + Vector3(0, 0.3, 0)
 	if test_options.has("debug"):
 		print("Искры: попадание в точке (%.1f, %.1f)" % [pos.x, pos.z])
+
+
+## Взрыв искр цвета врага при его гибели; у вампира втрое больше и крупнее.
+func spawn_burst(pos: Vector3, color: Color, size: float) -> void:
+	if _fx_root == null or str(test_options.get("fx", "1")) == "0":
+		return
+	var burst := Fx.sparks(color, int(30 * size), 1.0 + (size - 1.0) * 0.4)
+	_fx_root.add_child(burst)
+	burst.global_position = pos
+	if test_options.has("debug"):
+		print("Взрыв искр %s в точке (%.1f, %.1f)" % [color.to_html(false), pos.x, pos.z])
 
 
 func _build_graveyard() -> void:
@@ -496,6 +509,7 @@ func on_enemy_died(enemy: Node3D) -> void:
 	enemies.erase(enemy)
 	kills += 1
 	var pos := enemy.global_position
+	spawn_burst(pos + Vector3(0, 0.6, 0), Color(DEATH_COLORS.get(enemy.kind, "#ffffff")), 3.0 if enemy.is_boss else 1.0)
 	_spawn_soul(pos, enemy.xp, "soul")
 	if enemy.is_boss:
 		_spawn_soul(pos + Vector3(1, 0, 0), 0, "pumpkin")
