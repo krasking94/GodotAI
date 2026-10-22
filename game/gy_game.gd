@@ -13,7 +13,9 @@ extends Node3D
 ## камера, мир, враги, снаряды и души создаются кодом.
 ##
 ## Самопроверка для ИИ: --test-graveyard=seconds:30,auto:1,move:circle,seed:1,report:5,map:winter,quit:1
-## pick:N — в открытом окне выбрать строку N (вместе с shop); at:x:z — поставить героя в форпосте в точку.
+## pick:N — в открытом окне выбрать строку N (вместе с shop); at:x:z — поставить героя в форпосте в точку;
+## slots:nova.dash.frost.meteor — какие способности в слотах на эту ночь; cast:id:сек — включить способность
+## id на этой секунде (можно несколько через «;»); abilities:all — открыть все способности.
 ## seconds — длина раунда; auto — без меню и с автоматическим выбором прокачки; move — автопилот героя
 ## (circle кружит вокруг центра, away убегает от ближайшего врага, relic бежит к реликвии, none стоит);
 ## boss:секунда — когда выходит босс; rate — множитель частоты появления врагов; skin — имя скина;
@@ -96,6 +98,8 @@ const World := preload("res://game/gy_world.gd")
 const Save := preload("res://game/gy_save.gd")
 const Fx := preload("res://game/gy_fx.gd")
 const Base := preload("res://game/gy_base.gd")
+const Abilities := preload("res://game/gy_abilities.gd")
+const MAX_SLOTS := 4
 ## Цвет искр, которыми рассыпается погибший враг (по модели; подкрашенные — по своей подкраске).
 const DEATH_COLORS := {"zombie": "#7cff5a", "skeleton": "#ffffff", "ghost": "#8ad8ff", "vampire": "#ff3a3a", "character": "#ffd0a0"}
 
@@ -128,6 +132,7 @@ var player: CharacterBody3D
 var hud: CanvasLayer
 var world: Node3D
 var base: Node3D = null  # форпост (только в состоянии base/shop)
+var abilities: Node3D = null  # активные способности (только ночью)
 var bolts_root: Node3D
 var souls_earned := 0  # души за эту ночь
 var boss_killed := false
@@ -159,6 +164,8 @@ var _fx_root: Node3D
 var _quit_on_end := false
 var _end_timer := 0.0
 var _shop_timer := 0.0
+var _shake := 0.0
+var _casts: Array = []  # самопроверка: [id, секунда] — включить способность на этой секунде
 
 
 func _ready() -> void:
@@ -170,6 +177,9 @@ func _ready() -> void:
 	if test_options.has("unlock"):
 		for id in Maps.ids():
 			Save.unlock(id)
+	if test_options.has("abilities"):
+		for id in Abilities.ORDER:
+			Save.unlock_ability(id)
 	var mode := next_state
 	if mode == "":
 		if test_options.has("base"):
@@ -197,6 +207,17 @@ func _ready() -> void:
 	add_child(world)
 	world.build(map, _rng, str(test_options.get("fx", "1")) != "0")
 	arena = world.arena
+	abilities = Abilities.new()
+	abilities.name = "Abilities"
+	abilities.game = self
+	add_child(abilities)
+	abilities.slots = Save.slots().duplicate()
+	if test_options.has("slots"):
+		abilities.slots = Array(str(test_options["slots"]).split(".", false))
+	for item in str(test_options.get("cast", "")).split(";", false):
+		var pair: PackedStringArray = str(item).split(":")
+		if pair.size() >= 2:
+			_casts.append([pair[0], float(pair[1])])
 	round_seconds = float(map["round"])
 	if test_options.has("seconds"):
 		round_seconds = float(test_options["seconds"])
@@ -405,6 +426,13 @@ func _process(delta: float) -> void:
 	if _forced_levelup > 0.0 and elapsed >= _forced_levelup:
 		_forced_levelup = 0.0
 		_gain_xp(xp_needed - xp)
+	abilities.tick(delta)
+	for cast in _casts.duplicate():
+		if elapsed >= float(cast[1]):
+			_casts.erase(cast)
+			abilities.cast(str(cast[0]))
+	if hud != null:
+		hud.set_cooldowns(abilities)
 	_spawn(delta)
 	_update_souls(delta)
 	_update_relic(delta)
@@ -432,7 +460,24 @@ func _update_camera(delta: float, menu: bool) -> void:
 		target = player.global_position + Vector3(0, 9.5, 6.0) * zoom
 		look = player.global_position + Vector3(0, 0.5, 0)
 	_camera.position = _camera.position.lerp(target, 1.0 - exp(-6.0 * delta))
+	if _shake > 0.0:
+		_shake = maxf(_shake - delta * 2.0, 0.0)
+		_camera.position += Vector3(_rng.randf_range(-1, 1), _rng.randf_range(-1, 1), _rng.randf_range(-1, 1)) * _shake * 0.25
 	_camera.look_at(look, Vector3.UP)
+
+
+## Тряска камеры силой strength (0…1), гаснет за полсекунды.
+func shake(strength: float) -> void:
+	_shake = maxf(_shake, strength)
+
+
+## Клавиша 1–4 ночью: включить способность из слота.
+func cast_slot(index: int) -> void:
+	if state != "playing" or abilities == null or index < 0 or index >= abilities.slots.size():
+		return
+	var id := str(abilities.slots[index])
+	if not abilities.cast(id):
+		play_sound("hover")
 
 
 func _spawn(delta: float) -> void:
@@ -561,6 +606,8 @@ func _update_souls(delta: float) -> void:
 		var dist: float = to.length()
 		var kind := str(soul.get_meta("kind"))
 		var reach: float = player.magnet if kind == "soul" else 1.6
+		if abilities != null and abilities.pull_souls and kind == "soul":
+			reach = INF
 		if dist < reach and dist > 0.001:
 			soul.global_position += to / dist * minf(9.0 * delta, dist)
 		soul.position.y = 0.45 + sin(age * 4.0) * 0.1
@@ -867,8 +914,9 @@ func start_game() -> void:
 		hud.hide_menu()
 		hud.set_map_title(str(map["title"]))
 		hud.set_souls(Save.souls())
+		hud.show_slots(abilities.slots)
 	play_sound("click")
-	print("Кладбище: раунд начался, карта %s, герой %s, щит %d" % [map_id, SKINS[skin_index], int(player.shield)])
+	print("Кладбище: раунд начался, карта %s, герой %s, щит %d, слоты %s" % [map_id, SKINS[skin_index], int(player.shield), ", ".join(abilities.slots)])
 
 
 ## Постоянная прокачка с Алтаря душ и щит от укреплений действуют с начала каждой ночи.
@@ -895,11 +943,6 @@ func interact() -> void:
 
 
 func open_shop(id: String) -> void:
-	if id == "forge":
-		play_sound("click")
-		if hud != null:
-			hud.show_banner("Кузница пока закрыта: кузнец придёт на следующем этапе")
-		return
 	shop_id = id
 	state = "shop"
 	play_sound("select")
@@ -930,6 +973,7 @@ func _shop_title(id: String) -> String:
 		"camp": return "Костёр — кто пойдёт в ночь?"
 		"home": return "Дом сторожа — летопись"
 		"fence": return "Башня — укрепления форпоста"
+		"forge": return "Кузница — способности (слотов: %d)" % MAX_SLOTS
 	return id
 
 
@@ -937,6 +981,7 @@ func _shop_hint(id: String) -> String:
 	match id:
 		"gate": return "↑ ↓ выбрать · Enter — в путь или открыть за души · Esc — назад"
 		"home": return "Esc — назад"
+		"forge": return "↑ ↓ выбрать · Enter — купить, надеть или снять · Esc — назад · ночью клавиши 1–4"
 	return "↑ ↓ выбрать · Enter — купить · Esc — назад"
 
 
@@ -972,6 +1017,15 @@ func _shop_rows(id: String) -> Array:
 				var record := Save.record(map_entry_id)
 				rows.append({"id": map_entry_id, "title": "%d. %s" % [Maps.index_of(map_entry_id) + 1, Maps.title_of(map_entry_id)], "text": "",
 					"right": ("рекорд %d" % record if record > 0 else "—") + ("  ✓" if Save.is_won(map_entry_id) else ""), "locked": false, "action": ""})
+		"forge":
+			var slots := Save.slots()
+			for ability_id in Abilities.ORDER:
+				var a: Dictionary = Abilities.ABILITIES[ability_id]
+				var owned: bool = Save.abilities().has(ability_id)
+				var slot := slots.find(ability_id)
+				var right := ("в слоте %d" % (slot + 1)) if slot >= 0 else ("надеть" if owned else "✦ %d" % int(a["cost"]))
+				rows.append({"id": ability_id, "title": str(a["title"]), "text": str(a["text"]),
+					"right": "%d с · %s" % [int(a["cooldown"]), right], "locked": not owned and souls < int(a["cost"]), "action": "slot" if owned else "ability"})
 		"fence":
 			var level := Save.fence_level()
 			var maxed := level >= FENCE_COST.size()
@@ -1028,6 +1082,33 @@ func shop_pick(index: int) -> void:
 		"play":
 			get_tree().paused = false
 			go_to_map(str(row["id"]))
+		"ability":
+			var a: Dictionary = Abilities.ABILITIES[str(row["id"])]
+			if Save.spend(int(a["cost"])):
+				Save.unlock_ability(str(row["id"]))
+				var slots := Save.slots()
+				if slots.size() < MAX_SLOTS:
+					slots.append(str(row["id"]))
+					Save.set_slots(slots)
+				play_sound("levelup")
+				print("Куплена способность %s" % str(row["id"]))
+			else:
+				play_sound("hover")
+			_refresh_shop(index)
+		"slot":
+			var slots := Save.slots()
+			if slots.has(str(row["id"])):
+				slots.erase(str(row["id"]))
+				play_sound("click")
+			elif slots.size() < MAX_SLOTS:
+				slots.append(str(row["id"]))
+				play_sound("select")
+			else:
+				play_sound("hover")
+				if hud != null:
+					hud.show_banner("Все %d слота заняты: сними что-нибудь" % MAX_SLOTS)
+			Save.set_slots(slots)
+			_refresh_shop(index)
 		"skin":
 			skin_index = maxi(SKINS.find(str(row["id"])), 0)
 			player.set_skin(SKINS[skin_index])

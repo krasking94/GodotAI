@@ -14,8 +14,8 @@ const DEFAULT := {
 	"skin": "adventurer",
 	"souls": 0,
 	"upgrades": {},  # id постоянной прокачки → уровень
-	"abilities": [],  # id открытых способностей
-	"slots": [],  # id способностей в четырёх слотах
+	"abilities": ["nova"],  # id открытых способностей (Святая волна есть у всех с самого начала)
+	"slots": ["nova"],  # id способностей в четырёх слотах
 	"fence": 0,
 	"unlocked": ["old"],  # id открытых карт
 	"stats": {"nights": 0, "wins": 0, "kills": 0, "souls_total": 0},  # летопись
@@ -121,6 +121,26 @@ static func unlock(map_id: String) -> void:
 	load_data()
 	if not data["unlocked"].has(map_id):
 		data["unlocked"].append(map_id)
+	store()
+
+
+static func abilities() -> Array:
+	return load_data()["abilities"]
+
+
+static func slots() -> Array:
+	return load_data()["slots"]
+
+
+static func unlock_ability(id: String) -> void:
+	load_data()
+	if not data["abilities"].has(id):
+		data["abilities"].append(id)
+	store()
+
+
+static func set_slots(value: Array) -> void:
+	load_data()["slots"] = value.duplicate()
 	store()
 
 

@@ -4,7 +4,8 @@ extends CanvasLayer
 ## при ударе, большие надписи (победа, поражение), окно прокачки (три карточки с рисованными значками и пометкой
 ## «Рекомендуется»: клавиши 1 2 3, стрелки и Enter или мышь), стартовое меню (Enter — в форпост),
 ## табло форпоста (души, подсказка «E — …» у зданий) и окна зданий (список строк: ↑ ↓, Enter, Esc или мышь).
-## Под полосой здоровья — название карты, справа сверху — души. Работает и на паузе (process_mode ALWAYS): окно прокачки показывается,
+## Под полосой здоровья — название карты, справа сверху — души. Над полосой опыта — четыре слота способностей
+## (клавиши 1–4 или мышь): значок, название, затемнение перезарядки и секунды до готовности. Работает и на паузе (process_mode ALWAYS): окно прокачки показывается,
 ## когда игра стоит. Все клавиши меню, прокачки и R обрабатываются здесь и передаются в gy_game.gd.
 
 var game: Node = null
@@ -41,6 +42,8 @@ var _shop_rows: Array = []  # [PanelContainer, Label слева, Label спра�
 var _shop_focus := 0
 var _shop_count := 0
 var _auto_timer := 0.0
+var _slots_box: HBoxContainer
+var _slots: Array = []  # [PanelContainer, AbilityIcon, Label название, Label секунды, id]
 
 
 func _ready() -> void:
@@ -107,6 +110,7 @@ func _ready() -> void:
 	_xp_bar.offset_top = -30
 	_xp_bar.offset_bottom = -12
 	add_child(_xp_bar)
+	_build_slots()
 	_banner = _make_label(34)
 	_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_banner.grow_horizontal = Control.GROW_DIRECTION_BOTH
@@ -236,6 +240,56 @@ class UpgradeIcon extends Control:
 				draw_circle(c, r * 0.3, color)
 
 
+## Значок способности (gy_abilities.gd), нарисованный кодом: лучи, шевроны рывка, снежинка, метеор, костёр, часы.
+## charge — доля перезарядки 0…1: сверху вниз слот затемнён на (1 - charge).
+class AbilityIcon extends Control:
+	var kind := ""
+	var color := Color.WHITE
+	var charge := 1.0
+
+	func _draw() -> void:
+		var c := size * 0.5
+		var r := minf(size.x, size.y) * 0.5
+		var one := PackedColorArray([color])
+		draw_circle(c, r, Color(color, 0.14))
+		match kind:
+			"nova":
+				for i in 8:
+					var a := TAU * i / 8.0
+					draw_line(c + Vector2.from_angle(a) * r * 0.3, c + Vector2.from_angle(a) * r * 0.75, color, 3.0, true)
+				draw_circle(c, r * 0.2, color)
+			"dash":
+				for i in 2:
+					var x := c.x - r * 0.45 + i * r * 0.45
+					draw_polyline(PackedVector2Array([Vector2(x, c.y - r * 0.45), Vector2(x + r * 0.4, c.y), Vector2(x, c.y + r * 0.45)]), color, 4.0, true)
+			"frost":
+				for i in 6:
+					var a := TAU * i / 6.0
+					var tip := c + Vector2.from_angle(a) * r * 0.72
+					draw_line(c, tip, color, 3.0, true)
+					var mid := c + Vector2.from_angle(a) * r * 0.45
+					draw_line(mid, mid + Vector2.from_angle(a + 0.6) * r * 0.22, color, 2.5, true)
+					draw_line(mid, mid + Vector2.from_angle(a - 0.6) * r * 0.22, color, 2.5, true)
+			"meteor":
+				draw_circle(c + Vector2(r * 0.2, r * 0.2), r * 0.32, color)
+				for i in 3:
+					var off := Vector2(-r * 0.1, (i - 1) * r * 0.22)
+					draw_line(c + off + Vector2(0, r * 0.1), c + off + Vector2(-r * 0.65, -r * 0.45), Color(color, 0.8 - 0.2 * i), 3.0, true)
+			"fire":
+				draw_polygon(PackedVector2Array([c + Vector2(-r * 0.4, r * 0.5), c + Vector2(r * 0.4, r * 0.5), c + Vector2(r * 0.3, r * 0.05),
+					c + Vector2(r * 0.05, -r * 0.6), c + Vector2(-r * 0.15, -r * 0.1), c + Vector2(-r * 0.35, r * 0.05)]), one)
+				draw_line(c + Vector2(-r * 0.6, r * 0.6), c + Vector2(r * 0.6, r * 0.6), color, 4.0, true)
+			"time":
+				draw_arc(c, r * 0.62, 0.0, TAU, 32, color, 3.0, true)
+				draw_line(c, c + Vector2(0, -r * 0.42), color, 3.0, true)
+				draw_line(c, c + Vector2(r * 0.3, r * 0.15), color, 3.0, true)
+			_:
+				draw_circle(c, r * 0.3, color)
+		draw_arc(c, r - 1.5, 0.0, TAU, 48, color, 2.0, true)
+		if charge < 1.0:
+			draw_rect(Rect2(Vector2.ZERO, Vector2(size.x, size.y * (1.0 - charge))), Color(0, 0, 0, 0.62))
+
+
 ## Стрелка к реликвии под таймером: лиловый треугольник, повёрнутый в сторону реликвии.
 class RelicArrow extends Control:
 	var angle := 0.0
@@ -257,6 +311,107 @@ func _card_style(color: Color, focused: bool) -> StyleBoxFlat:
 	box.set_corner_radius_all(12)
 	box.set_content_margin_all(14)
 	return box
+
+
+func _slot_style(color: Color, ready: bool) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.05, 0.06, 0.1, 0.9)
+	box.border_color = color if ready else Color(color, 0.35)
+	box.set_border_width_all(2)
+	box.set_corner_radius_all(10)
+	box.set_content_margin_all(6)
+	return box
+
+
+## Четыре слота способностей над полосой опыта: значок, название, цифра клавиши и секунды перезарядки.
+func _build_slots() -> void:
+	_slots_box = HBoxContainer.new()
+	_slots_box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_slots_box.offset_left = -246
+	_slots_box.offset_right = 246
+	_slots_box.offset_top = -118
+	_slots_box.offset_bottom = -40
+	_slots_box.add_theme_constant_override("separation", 8)
+	_slots_box.visible = false
+	add_child(_slots_box)
+	for i in 4:
+		var panel := PanelContainer.new()
+		panel.custom_minimum_size = Vector2(116, 78)
+		panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		panel.gui_input.connect(_on_slot_input.bind(i))
+		var box := HBoxContainer.new()
+		box.add_theme_constant_override("separation", 6)
+		panel.add_child(box)
+		var icon := AbilityIcon.new()
+		icon.custom_minimum_size = Vector2(44, 44)
+		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		box.add_child(icon)
+		var column := VBoxContainer.new()
+		column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		column.add_theme_constant_override("separation", 0)
+		box.add_child(column)
+		var key := _make_label(13)
+		key.text = str(i + 1)
+		key.modulate = Color(1, 1, 1, 0.6)
+		column.add_child(key)
+		var title := _make_label(14)
+		title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		column.add_child(title)
+		var seconds := _make_label(15)
+		seconds.modulate = Color("#ffd27a")
+		column.add_child(seconds)
+		_slots_box.add_child(panel)
+		_slots.append([panel, icon, title, seconds, ""])
+
+
+func _on_slot_input(event: InputEvent, index: int) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and game != null:
+		game.cast_slot(index)
+
+
+## Показать слоты на ночь: ids — способности по порядку (до 4), пустые слоты скрыты.
+func show_slots(ids: Array) -> void:
+	var Abilities := load("res://game/gy_abilities.gd")
+	for i in _slots.size():
+		var slot: Array = _slots[i]
+		var id := str(ids[i]) if i < ids.size() else ""
+		slot[4] = id
+		var panel: PanelContainer = slot[0]
+		panel.visible = id != "" and Abilities.ABILITIES.has(id)
+		if not panel.visible:
+			continue
+		var stats: Dictionary = Abilities.ABILITIES[id]
+		var icon: AbilityIcon = slot[1]
+		icon.kind = id
+		icon.color = Color(str(stats["color"]))
+		icon.charge = 1.0
+		icon.queue_redraw()
+		var title: Label = slot[2]
+		title.text = str(stats.get("short", stats["title"]))
+		var seconds: Label = slot[3]
+		seconds.text = ""
+		panel.add_theme_stylebox_override("panel", _slot_style(icon.color, true))
+	_slots_box.visible = ids.size() > 0
+
+
+## Обновить перезарядку слотов из узла способностей (каждый кадр ночью).
+func set_cooldowns(abilities: Node) -> void:
+	if not _slots_box.visible:
+		return
+	for slot in _slots:
+		var id := str(slot[4])
+		if id == "":
+			continue
+		var state: Array = abilities.cooldown_state(id)
+		var icon: AbilityIcon = slot[1]
+		var was_ready := icon.charge >= 1.0
+		icon.charge = float(state[0])
+		icon.queue_redraw()
+		var seconds: Label = slot[3]
+		seconds.text = ("%d с" % int(ceil(float(state[1])))) if float(state[1]) > 0.0 else ""
+		if was_ready != (icon.charge >= 1.0):
+			var panel: PanelContainer = slot[0]
+			panel.add_theme_stylebox_override("panel", _slot_style(icon.color, icon.charge >= 1.0))
 
 
 func _build_levelup() -> void:
@@ -486,6 +641,15 @@ func _input(event: InputEvent) -> void:
 	var key: int = event.physical_keycode
 	var state := str(game.get("state"))
 	match state:
+		"playing":
+			if key == KEY_1 or key == KEY_KP_1:
+				game.cast_slot(0)
+			elif key == KEY_2 or key == KEY_KP_2:
+				game.cast_slot(1)
+			elif key == KEY_3 or key == KEY_KP_3:
+				game.cast_slot(2)
+			elif key == KEY_4 or key == KEY_KP_4:
+				game.cast_slot(3)
 		"levelup":
 			if key == KEY_1 or key == KEY_KP_1:
 				game.choose_upgrade(0)
@@ -609,6 +773,8 @@ func _set_hud_visible(shown: bool) -> void:
 	_kills_label.visible = shown
 	_best_label.visible = shown
 	_souls_label.visible = shown
+	if not shown:
+		_slots_box.visible = false
 
 
 func hide_menu() -> void:
