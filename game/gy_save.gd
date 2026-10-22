@@ -19,6 +19,7 @@ const DEFAULT := {
 	"fence": 0,
 	"unlocked": ["old"],  # id открытых карт
 	"stats": {"nights": 0, "wins": 0, "kills": 0, "souls_total": 0},  # летопись
+	"tutorial": {},  # пройденные шаги обучения: base, night, after → true
 }
 
 static var data: Dictionary = {}
@@ -152,6 +153,18 @@ static func add_stat(key: String, amount: int) -> void:
 
 static func stat(key: String) -> int:
 	return int(load_data()["stats"].get(key, 0))
+
+
+static func tutorial_done(key: String) -> bool:
+	return bool(load_data().get("tutorial", {}).get(key, false))
+
+
+static func set_tutorial_done(key: String) -> void:
+	load_data()
+	if not data.has("tutorial"):
+		data["tutorial"] = {}
+	data["tutorial"][key] = true
+	store()
 
 
 static func skin() -> String:

@@ -15,7 +15,8 @@ extends Node3D
 ## Самопроверка для ИИ: --test-graveyard=seconds:30,auto:1,move:circle,seed:1,report:5,map:winter,quit:1
 ## pick:N — в открытом окне выбрать строку N (вместе с shop); at:x:z — поставить героя в форпосте в точку;
 ## slots:nova.dash.frost.meteor — какие способности в слотах на эту ночь; cast:id:сек — включить способность
-## id на этой секунде (можно несколько через «;»); abilities:all — открыть все способности; god:1 — герой бессмертен.
+## id на этой секунде (можно несколько через «;»); abilities:all — открыть все способности; god:1 — герой бессмертен;
+## tutorial:1 — показать обучение, даже если оно уже пройдено; help:1 — открыть окно «Как играть» в форпосте.
 ## seconds — длина раунда; auto — без меню и с автоматическим выбором прокачки; move — автопилот героя
 ## (circle кружит вокруг центра, away убегает от ближайшего врага, relic бежит к реликвии, none стоит);
 ## boss:секунда — когда выходит босс; rate — множитель частоты появления врагов; skin — имя скина;
@@ -77,6 +78,29 @@ const UPGRADES := [
 	{"id": "pierce", "title": "Пробивание", "text": "Снаряд пробивает ещё одного врага"},
 	{"id": "regen", "title": "Восстановление", "text": "+1 здоровья в секунду"},
 ]
+## Обычные уровни растут сами, без остановки игры: по кругу из этого списка. Выбор из трёх карточек —
+## только на вехах (уровни 2, 5, 9, 14, 20, 27, 35…: промежуток растёт на единицу).
+const AUTO_BOOSTS := [
+	{"id": "damage", "title": "урон +6 %"},
+	{"id": "health", "title": "здоровье +6"},
+	{"id": "rate", "title": "скорострельность +4 %"},
+	{"id": "speed", "title": "скорость +3 %"},
+	{"id": "magnet", "title": "магнит душ +0,3 м"},
+]
+## Обучение в первую ночь: [секунда, текст]; каждая подсказка висит 9 с.
+const NIGHT_HINTS := [
+	[1.0, "Герой стреляет сам. Твоё дело — бегать (W A S D) и не дать себя окружить."],
+	[11.0, "Синие огоньки — души. Собирай их: ночью это опыт, в форпосте — валюта."],
+	[22.0, "Клавиша 1 — Святая волна: отбрасывает всех вокруг. Жми, когда зажали."],
+	[34.0, "Каждые 30 секунд приходит волна. Табло наверху скажет, откуда."],
+	[52.0, "Уровни растут сами. На вехах игра остановится и даст выбрать одно улучшение."],
+	[76.0, "Продержись до конца таймера наверху — ночь выиграна, души твои."],
+]
+const BASE_HINTS := {
+	"walk": "Это форпост — твоя база между ночами. Ходи клавишами W A S D. Стрелка наверху ведёт к воротам: там начинается ночь. H — как играть.",
+	"gate": "Нажми E у ворот. Выбери «Старый погост» стрелками ↑ ↓ и нажми Enter.",
+	"after": "Души за ночь получены. Стрелка ведёт к алтарю: там постоянная прокачка. Кузница справа — способности на клавиши 1–4, башня — укрепления, ворота — новые карты.",
+}
 ## Постоянная прокачка на Алтаре душ: level растёт за души, cost — цена первого уровня (дальше × (уровень+1)).
 const PERMANENT := [
 	{"id": "body", "title": "Крепкое тело", "text": "+10 к здоровью за уровень", "max": 5, "cost": 30},
@@ -96,6 +120,9 @@ const RELIC_COLOR := Color("#c070ff")
 const SPAWN_MIN := 17.0
 const SPAWN_MAX := 22.0
 const MAX_ENEMIES := 90
+const HARD_HP := 1.2  # сложность (22.10, просьба Макса «усложнить»): здоровье обычных врагов × 1,2
+const HARD_DAMAGE := 1.2  # урон всех врагов × 1,2
+const HARD_PUMPKIN := 0.6  # тыквы (лечение) падают реже
 const WAVE_EVERY := 30.0  # волна каждые 30 с: толпа с одной стороны и объявление на табло
 const BLOOD_AT := 0.45  # кровавая минута начинается на этой доле раунда
 const BLOOD_LENGTH := 45.0
@@ -131,7 +158,7 @@ var elapsed := 0.0
 var kills := 0
 var level := 1
 var xp := 0
-var xp_needed := 5
+var xp_needed := 10
 var boss_time := 0.0
 var boss_spawned := false
 var skin_index := 0
@@ -190,6 +217,12 @@ var _blood_left := 0.0
 var _combo_timer := 0.0
 var _numbers: Array = []  # цифры урона: [Label3D, возраст]
 var _numbers_root: Node3D
+var _auto_count := 0  # сколько автоматических уровней было (для выбора следующего бонуса по кругу)
+var _force_choice := false  # самопроверка levelup:сек — открыть окно выбора даже не на вехе
+var _tutorial := ""  # шаг обучения: walk, gate (форпост), night (первая ночь), after (форпост после ночи)
+var _hint_index := 0
+var _guide_target := Vector3.INF  # куда ведёт стрелка-проводник
+var _guide_text := ""
 
 
 func _ready() -> void:
@@ -312,6 +345,9 @@ func _setup_base() -> void:
 		hud.show_base(Save.souls())
 	_menu_light.visible = false
 	state = "base"
+	_start_base_tutorial()
+	if hud != null and test_options.has("help"):
+		hud.toggle_help()  # снимок окна «Как играть»
 	_quit_on_end = test_options.has("quit")
 	_shop_timer = 1.0 if test_options.has("shop") else 0.0
 	print("Форпост готов: душ %d, укрепления %d, открыто карт %d" % [Save.souls(), Save.fence_level(), Save.data["unlocked"].size()])
@@ -428,6 +464,7 @@ func _process(delta: float) -> void:
 		if hud != null and state == "base":
 			var spot: Dictionary = base.nearest_spot(player.global_position)
 			hud.set_prompt("E — %s" % str(spot["title"]) if not spot.is_empty() else "")
+			_tick_base_tutorial()
 		if _shop_timer > 0.0:
 			_shop_timer -= delta
 			if _shop_timer <= 0.0:
@@ -449,7 +486,9 @@ func _process(delta: float) -> void:
 	elapsed += delta
 	if _forced_levelup > 0.0 and elapsed >= _forced_levelup:
 		_forced_levelup = 0.0
+		_force_choice = true
 		_gain_xp(xp_needed - xp)
+	_tick_night_tutorial()
 	abilities.tick(delta)
 	for cast in _casts.duplicate():
 		if elapsed >= float(cast[1]):
@@ -520,7 +559,7 @@ func _update_waves(delta: float) -> void:
 		wave += 1
 		var side: Array = SIDES[_rng.randi_range(0, SIDES.size() - 1)]
 		var dir: Vector3 = side[1]
-		var count := mini(4 + 2 * wave, 20)
+		var count := mini(6 + 2 * wave, 24)
 		var spawned := 0
 		for i in count:
 			if enemies.size() >= MAX_ENEMIES:
@@ -628,7 +667,7 @@ func boss_stomp(boss: Node3D, radius: float, damage: float) -> void:
 
 
 func _spawn(delta: float) -> void:
-	var rate := (0.7 + elapsed / 35.0) * float(map["rate"]) * float(test_options.get("rate", 1.0))
+	var rate := (0.85 + elapsed / 30.0) * float(map["rate"]) * float(test_options.get("rate", 1.0))
 	if blood:
 		rate *= 1.5
 	if last_stand:
@@ -677,7 +716,8 @@ func _spawn_enemy(kind: String, at: Vector3 = Vector3.INF) -> Node3D:
 	pos.y = 0.05
 	var stats: Dictionary = ENEMY_KINDS[kind].duplicate()
 	if not bool(stats.get("guard", false)):
-		stats["hp"] = float(stats["hp"]) * float(map["tough"])
+		stats["hp"] = float(stats["hp"]) * float(map["tough"]) * (1.0 if bool(stats.get("boss", false)) else HARD_HP)
+		stats["damage"] = float(stats["damage"]) * HARD_DAMAGE
 	enemy.setup(kind, stats, self)
 	_enemies_root.add_child(enemy)
 	enemy.global_position = pos
@@ -720,7 +760,7 @@ func on_enemy_died(enemy: Node3D) -> void:
 		if hud != null:
 			hud.show_banner("%s повержен!" % enemy.title)
 		print("Босс %s повержен на %d с" % [enemy.title, int(elapsed)])
-	elif _rng.randf() < float(map["pumpkin_chance"]) + 0.03 * Save.upgrade_level("luck"):
+	elif _rng.randf() < float(map["pumpkin_chance"]) * HARD_PUMPKIN + 0.03 * Save.upgrade_level("luck"):
 		_spawn_soul(pos + Vector3(0.6, 0, 0), 0, "pumpkin")
 	if enemy.is_boss:
 		pass
@@ -904,11 +944,25 @@ func _gain_xp(amount: int) -> void:
 	if xp >= xp_needed:
 		xp -= xp_needed
 		level += 1
-		xp_needed = 4 + level * 2
+		xp_needed = 6 + level * 4  # опыт медленнее: уровень 5 после ~70 душ, 9 — после ~200
 		_level_up()
 
 
+## Веха — уровень, на котором дают выбрать улучшение: 2, 5, 9, 14, 20, 27, 35… (промежуток растёт на единицу).
+static func is_milestone(level_number: int) -> bool:
+	var m := 2
+	var gap := 3
+	while m < level_number:
+		m += gap
+		gap += 1
+	return m == level_number
+
+
 func _level_up() -> void:
+	if not is_milestone(level) and not _force_choice:
+		_auto_boost()
+		return
+	_force_choice = false
 	state = "levelup"
 	var pool := UPGRADES.duplicate()
 	pool.shuffle()
@@ -919,6 +973,95 @@ func _level_up() -> void:
 	if hud != null:
 		hud.show_levelup(_levelup_options, level, recommended_index)
 	print("Новый уровень %d: выбор из %s, рекомендуется %s" % [level, ", ".join(_levelup_options.map(func(u): return str(u["title"]))), str(_levelup_options[recommended_index]["title"])])
+
+
+## Обычный уровень: небольшой бонус сам собой, игра не останавливается, табло сообщает что выросло.
+func _auto_boost() -> void:
+	var boost: Dictionary = AUTO_BOOSTS[_auto_count % AUTO_BOOSTS.size()]
+	_auto_count += 1
+	match str(boost["id"]):
+		"damage":
+			player.damage *= 1.06
+		"health":
+			player.max_hp += 6.0
+			player.hp = minf(player.hp + 6.0, player.max_hp)
+		"rate":
+			player.fire_interval /= 1.04
+		"speed":
+			player.speed *= 1.03
+		"magnet":
+			player.magnet += 0.3
+	play_sound("pickup")
+	spawn_burst(player.global_position + Vector3(0, 1.0, 0), Color("#4fd8ff"), 0.9)
+	if hud != null:
+		hud.show_banner("Уровень %d · %s" % [level, str(boost["title"])], "#4fd8ff")
+	print("Уровень %d сам собой: %s" % [level, str(boost["title"])])
+
+
+# --- Обучение ---
+
+## Форпост: первый раз — проводник к воротам; после первой ночи — к алтарю. tutorial:1 показывает заново.
+func _start_base_tutorial() -> void:
+	var force := test_options.has("tutorial") and str(test_options["tutorial"]) != "0"
+	if force or not Save.tutorial_done("base"):
+		_tutorial = "walk"
+		_guide_target = _spot_position("gate")
+		_guide_text = "Ворота"
+	elif not Save.tutorial_done("after") and Save.stat("nights") >= 1:
+		_tutorial = "after"
+		_guide_target = _spot_position("altar")
+		_guide_text = "Алтарь душ"
+	else:
+		_tutorial = ""
+		return
+	print("Обучение: шаг %s" % _tutorial)
+
+
+func _spot_position(id: String) -> Vector3:
+	for spot in base.spots:
+		if str(spot[2]) == id:
+			return spot[0]
+	return Vector3.INF
+
+
+func _tick_base_tutorial() -> void:
+	if _tutorial == "" or hud == null:
+		return
+	if _tutorial == "walk" and _guide_target != Vector3.INF and player.global_position.distance_to(_guide_target) < 5.0:
+		_tutorial = "gate"
+		print("Обучение: шаг gate")
+	var text := str(BASE_HINTS.get(_tutorial, ""))
+	if text != "" and hud.hint_text != text:
+		hud.show_hint(text)
+	if _guide_target != Vector3.INF:
+		var d := _guide_target - player.global_position
+		var far := d.length() > 3.0
+		hud.set_guide(far, atan2(d.z, d.x), "%s: %d м" % [_guide_text, int(d.length())], Color("#7aff9a"))
+
+
+## Шаг обучения закрыт: ворота открыты (base) или алтарь открыт (after).
+func _tutorial_shop_opened(id: String) -> void:
+	if (_tutorial == "walk" or _tutorial == "gate") and id == "gate":
+		Save.set_tutorial_done("base")
+	elif _tutorial == "after" and id == "altar":
+		Save.set_tutorial_done("after")
+	else:
+		return
+	print("Обучение: шаг %s пройден" % _tutorial)
+	_tutorial = ""
+	_guide_target = Vector3.INF
+	if hud != null:
+		hud.hide_hint()
+		hud.set_guide(false, 0.0, "", Color.WHITE)
+
+
+func _tick_night_tutorial() -> void:
+	if _tutorial != "night" or hud == null or _hint_index >= NIGHT_HINTS.size():
+		return
+	var item: Array = NIGHT_HINTS[_hint_index]
+	if elapsed >= float(item[0]):
+		_hint_index += 1
+		hud.show_hint(str(item[1]), 9.0)
 
 
 ## Совет игроку: что из предложенного полезнее прямо сейчас. Мало здоровья — лечение и восстановление,
@@ -1007,6 +1150,9 @@ func _finish_round(won: bool) -> void:
 	Save.add_souls(souls_earned)
 	Save.add_stat("nights", 1)
 	Save.add_stat("kills", kills)
+	if _tutorial == "night":
+		Save.set_tutorial_done("night")
+		_tutorial = ""
 	if won:
 		Save.add_stat("wins", 1)
 	play_sound("win" if won else "over")
@@ -1072,6 +1218,11 @@ func start_game() -> void:
 	state = "playing"
 	player.rotation.y = 0.0
 	_apply_permanent()
+	var force_tutorial := test_options.has("tutorial") and str(test_options["tutorial"]) != "0"
+	if force_tutorial or not Save.tutorial_done("night"):
+		_tutorial = "night"
+		_hint_index = 0
+		print("Обучение: первая ночь")
 	if _menu_light != null:
 		_menu_light.visible = false
 	if hud != null:
@@ -1112,6 +1263,7 @@ func open_shop(id: String) -> void:
 	play_sound("select")
 	_refresh_shop(0)
 	print("Открыто окно: %s" % id)
+	_tutorial_shop_opened(id)
 
 
 func _refresh_shop(selected: int) -> void:
