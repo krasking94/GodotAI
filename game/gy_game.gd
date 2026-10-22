@@ -75,6 +75,7 @@ const DEATH_COLORS := {"zombie": "#7cff5a", "skeleton": "#ffffff", "ghost": "#8a
 
 var _spawn_budget := 0.0
 var _report_every := 0.0
+var _forced_levelup := 0.0
 var _report_timer := 0.0
 var _rng := RandomNumberGenerator.new()
 var _camera: Camera3D
@@ -84,6 +85,8 @@ var _souls_root: Node3D
 var _decor_root: Node3D
 var _sounds := {}
 var _levelup_options: Array = []
+var recommended_index := 0  # какую из трёх прокачек игра советует (подсказка «Рекомендуется»)
+var hold_levelup := false  # окно прокачки не закрывать автоматически (снимок окна по --test graveyard=levelup:сек)
 var _fires: Array = []  # [OmniLight3D, фаза] для мерцания
 var _soul_material: StandardMaterial3D
 var _solid_spots: Array = []  # Vector2 занятых мест, чтобы украшения не лезли друг в друга
@@ -110,6 +113,8 @@ func _ready() -> void:
 		round_seconds = float(test_options["seconds"])
 	boss_time = float(test_options["boss"]) if test_options.has("boss") else round_seconds * 0.8
 	_report_every = float(test_options.get("report", 0.0))
+	_forced_levelup = float(test_options.get("levelup", 0.0))  # на этой секунде открыть окно прокачки (для снимков)
+	hold_levelup = _forced_levelup > 0.0
 	auto = test_options.has("auto") or test_options.has("move")
 	best_score = _load_best()
 	if test_options.has("skin"):
@@ -285,7 +290,7 @@ func spawn_sparks(pos: Vector3) -> void:
 func spawn_burst(pos: Vector3, color: Color, size: float) -> void:
 	if _fx_root == null or str(test_options.get("fx", "1")) == "0":
 		return
-	var burst := Fx.sparks(color, int(30 * size), 1.0 + (size - 1.0) * 0.4)
+	var burst := Fx.sparks(color, int(14 * size), 1.0 + (size - 1.0) * 0.4)
 	_fx_root.add_child(burst)
 	burst.global_position = pos
 	if test_options.has("debug"):
@@ -430,6 +435,9 @@ func _process(delta: float) -> void:
 	if state != "playing":
 		return
 	elapsed += delta
+	if _forced_levelup > 0.0 and elapsed >= _forced_levelup:
+		_forced_levelup = 0.0
+		_gain_xp(xp_needed - xp)
 	_spawn(delta)
 	_update_souls(delta)
 	if hud != null:
@@ -596,11 +604,44 @@ func _level_up() -> void:
 	var pool := UPGRADES.duplicate()
 	pool.shuffle()
 	_levelup_options = pool.slice(0, 3)
+	recommended_index = _recommend(_levelup_options)
 	get_tree().paused = true
 	play_sound("levelup")
 	if hud != null:
-		hud.show_levelup(_levelup_options, level)
-	print("Новый уровень %d: выбор из %s" % [level, ", ".join(_levelup_options.map(func(u): return str(u["title"]))) ])
+		hud.show_levelup(_levelup_options, level, recommended_index)
+	print("Новый уровень %d: выбор из %s, рекомендуется %s" % [level, ", ".join(_levelup_options.map(func(u): return str(u["title"]))), str(_levelup_options[recommended_index]["title"])])
+
+
+## Совет игроку: что из предложенного полезнее прямо сейчас. Мало здоровья — лечение и восстановление,
+## мало снарядов — ещё снаряд, иначе урон и скорострельность; выбрать всё равно можно что угодно.
+func _recommend(options: Array) -> int:
+	var hp_part: float = player.hp / maxf(player.max_hp, 1.0)
+	var best_index := 0
+	var best_score := -1.0
+	for i in options.size():
+		var option: Dictionary = options[i]
+		var score := 1.0
+		match str(option["id"]):
+			"health":
+				score = 3.5 if hp_part < 0.5 else (1.6 if level >= 5 else 0.9)
+			"regen":
+				score = 2.6 if hp_part < 0.6 else 1.1
+			"multishot":
+				score = 2.4 if player.projectiles < 3 else 1.3
+			"damage":
+				score = 1.8 if level >= 3 else 1.4
+			"rate":
+				score = 1.7
+			"pierce":
+				score = 1.5 if player.projectiles >= 2 else 0.8
+			"speed":
+				score = 1.2 if player.speed < 6.5 else 0.6
+			"magnet":
+				score = 1.4 if souls.size() > 6 else 0.7
+		if score > best_score:
+			best_score = score
+			best_index = i
+	return best_index
 
 
 func choose_upgrade(index: int) -> void:

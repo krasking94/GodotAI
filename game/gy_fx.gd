@@ -6,6 +6,11 @@ extends RefCounted
 
 static var _dot_texture: GradientTexture2D
 static var _leaf_texture: GradientTexture2D
+## На телефонах частиц вдвое меньше, чтобы не подвисало.
+static func budget() -> float:
+	return 0.5 if OS.has_feature("mobile") else 1.0
+
+
 static var _spark_materials := {}  # цвет → материал искр, чтобы не плодить материалы на каждый всплеск
 static var _spark_mesh: QuadMesh
 
@@ -54,11 +59,11 @@ static func _glow_material(color: Color, energy: float) -> StandardMaterial3D:
 	return material
 
 
-## Светлячки: сотня точек в коробке вокруг героя, медленно плывут и мигают (альфа по кривой жизни).
+## Светлячки: десятки точек в коробке вокруг героя, медленно плывут и мигают (альфа по кривой жизни).
 static func fireflies() -> CPUParticles3D:
 	var p := CPUParticles3D.new()
 	p.name = "Fireflies"
-	p.amount = 110
+	p.amount = int(45 * budget())
 	p.lifetime = 7.0
 	p.preprocess = 7.0
 	p.randomness = 0.6
@@ -88,7 +93,7 @@ static func fireflies() -> CPUParticles3D:
 static func leaves() -> CPUParticles3D:
 	var p := CPUParticles3D.new()
 	p.name = "Leaves"
-	p.amount = 70
+	p.amount = int(24 * budget())
 	p.lifetime = 8.0
 	p.preprocess = 8.0
 	p.randomness = 0.5
@@ -129,7 +134,7 @@ static func leaves() -> CPUParticles3D:
 
 ## Искры: один всплеск точек, разлетаются во все стороны, падают, гаснут; сами удаляются.
 ## По умолчанию — горячие искры попадания; при гибели врага зовётся с его цветом и большим числом точек.
-static func sparks(color: Color = Color("#ffd27a"), amount: int = 14, size: float = 1.0) -> CPUParticles3D:
+static func sparks(color: Color = Color("#ffd27a"), amount: int = 8, size: float = 1.0) -> CPUParticles3D:
 	if _spark_mesh == null:
 		_spark_mesh = QuadMesh.new()
 		_spark_mesh.size = Vector2(0.14, 0.14)
@@ -138,7 +143,7 @@ static func sparks(color: Color = Color("#ffd27a"), amount: int = 14, size: floa
 		_spark_materials[key] = _glow_material(color, 4.0)
 	var p := CPUParticles3D.new()
 	p.name = "Sparks"
-	p.amount = amount
+	p.amount = maxi(int(amount * budget()), 4)
 	p.lifetime = 0.45 + 0.15 * (size - 1.0)
 	p.one_shot = true
 	p.explosiveness = 1.0
