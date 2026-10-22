@@ -2,8 +2,9 @@ extends CanvasLayer
 
 ## Табло «Кладбища»: полоса здоровья, таймер, уровень, убитые, рекорд, полоса опыта внизу, красная вспышка
 ## при ударе, большие надписи (победа, поражение), окно прокачки (три карточки с рисованными значками и пометкой
-## «Рекомендуется»: клавиши 1 2 3, стрелки и Enter или мышь) и стартовое меню
-## (← → карта, ↑ ↓ скин, Enter — начать). Под полосой здоровья — название карты. Работает и на паузе (process_mode ALWAYS): окно прокачки показывается,
+## «Рекомендуется»: клавиши 1 2 3, стрелки и Enter или мышь), стартовое меню (Enter — в форпост),
+## табло форпоста (души, подсказка «E — …» у зданий) и окна зданий (список строк: ↑ ↓, Enter, Esc или мышь).
+## Под полосой здоровья — название карты, справа сверху — души. Работает и на паузе (process_mode ALWAYS): окно прокачки показывается,
 ## когда игра стоит. Все клавиши меню, прокачки и R обрабатываются здесь и передаются в gy_game.gd.
 
 var game: Node = null
@@ -27,11 +28,18 @@ var _levelup_count := 3
 var _relic_arrow: RelicArrow
 var _relic_label: Label
 var _menu_panel: PanelContainer
-var _menu_skin: Label
-var _menu_best: Label
-var _menu_map: Label
-var _menu_subtitle: Label
+var _menu_souls: Label
+var _menu_hint: Label
 var _map_label: Label
+var _souls_label: Label
+var _prompt_label: Label
+var _shop_panel: PanelContainer
+var _shop_title: Label
+var _shop_hint: Label
+var _shop_rows_box: VBoxContainer
+var _shop_rows: Array = []  # [PanelContainer, Label слева, Label справа]
+var _shop_focus := 0
+var _shop_count := 0
 var _auto_timer := 0.0
 
 
@@ -54,6 +62,21 @@ func _ready() -> void:
 	_map_label.position = Vector2(18, 44)
 	_map_label.modulate = Color(1, 1, 1, 0.8)
 	add_child(_map_label)
+	_souls_label = _make_label(22)
+	_souls_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	_souls_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_souls_label.offset_right = -16
+	_souls_label.offset_top = 104
+	_souls_label.add_theme_color_override("font_color", Color("#9fe8ff"))
+	add_child(_souls_label)
+	_prompt_label = _make_label(26)
+	_prompt_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_prompt_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_prompt_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_prompt_label.offset_bottom = -60
+	_prompt_label.add_theme_color_override("font_color", Color("#ffe0a0"))
+	_prompt_label.visible = false
+	add_child(_prompt_label)
 	_time_label = _make_label(40)
 	_time_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_time_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
@@ -117,6 +140,7 @@ func _ready() -> void:
 	add_child(_relic_label)
 	_build_levelup()
 	_build_menu()
+	_build_shop()
 
 
 func _make_label(size: int) -> Label:
@@ -315,36 +339,131 @@ func _build_menu() -> void:
 	title.add_theme_color_override("font_color", Color("#ffb347"))
 	column.add_child(title)
 	var subtitle := _make_label(18)
-	subtitle.text = "Продержись ночь против орды нежити"
+	subtitle.text = "Последний сторож погоста. Десять ночей, десять погостов."
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.modulate = Color(1, 1, 1, 0.8)
 	column.add_child(subtitle)
-	_menu_map = _make_label(30)
-	_menu_map.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_menu_map.add_theme_color_override("font_color", Color("#ffe0a0"))
-	column.add_child(_menu_map)
-	_menu_subtitle = _make_label(17)
-	_menu_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_menu_subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_menu_subtitle.custom_minimum_size = Vector2(560, 0)
-	column.add_child(_menu_subtitle)
-	_menu_best = _make_label(18)
-	_menu_best.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(_menu_best)
-	_menu_skin = _make_label(24)
-	_menu_skin.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(_menu_skin)
-	var hint := _make_label(16)
-	hint.text = "← → карта · ↑ ↓ герой · Enter — начать\nСтрелки или WASD — бегать, герой стреляет сам, 1 2 3 — прокачка"
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.modulate = Color(1, 1, 1, 0.65)
-	column.add_child(hint)
+	_menu_souls = _make_label(22)
+	_menu_souls.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_menu_souls.add_theme_color_override("font_color", Color("#9fe8ff"))
+	column.add_child(_menu_souls)
+	var start := _make_label(28)
+	start.text = "Enter — в форпост"
+	start.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	start.add_theme_color_override("font_color", Color("#ffe0a0"))
+	column.add_child(start)
+	_menu_hint = _make_label(16)
+	_menu_hint.text = "В форпосте: стрелки или WASD — ходить, E у здания — войти, ворота ведут в ночь\nНочью герой стреляет сам, 1 2 3 — прокачка на новом уровне"
+	_menu_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_menu_hint.modulate = Color(1, 1, 1, 0.65)
+	column.add_child(_menu_hint)
 	_menu_panel.add_child(column)
 	_menu_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	_menu_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_menu_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_menu_panel.offset_bottom = -16
 	add_child(_menu_panel)
+
+
+func _row_style(focused: bool, locked: bool) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.12, 0.13, 0.2, 0.98) if focused else Color(0.06, 0.07, 0.11, 0.9)
+	box.border_color = Color("#ffe0a0") if focused else Color(1, 1, 1, 0.12)
+	box.set_border_width_all(2 if focused else 1)
+	box.set_corner_radius_all(8)
+	box.content_margin_left = 12
+	box.content_margin_right = 12
+	box.content_margin_top = 5
+	box.content_margin_bottom = 5
+	if locked:
+		box.bg_color = box.bg_color.darkened(0.3)
+	return box
+
+
+## Окно здания форпоста: заголовок, до 12 строк (слева название и описание, справа цена или состояние), подсказка.
+func _build_shop() -> void:
+	_shop_panel = _panel()
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 8)
+	_shop_title = _make_label(28)
+	_shop_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_shop_title.add_theme_color_override("font_color", Color("#ffe0a0"))
+	column.add_child(_shop_title)
+	_shop_rows_box = VBoxContainer.new()
+	_shop_rows_box.add_theme_constant_override("separation", 4)
+	for i in 12:
+		var row := PanelContainer.new()
+		row.custom_minimum_size = Vector2(760, 0)
+		row.mouse_filter = Control.MOUSE_FILTER_STOP
+		row.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		row.gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and game != null:
+				game.shop_pick(i))
+		row.mouse_entered.connect(func(): _set_shop_focus(i))
+		var line := HBoxContainer.new()
+		line.add_theme_constant_override("separation", 12)
+		var left := _make_label(17)
+		left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		left.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		line.add_child(left)
+		var right := _make_label(17)
+		right.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		right.custom_minimum_size = Vector2(150, 0)
+		right.add_theme_color_override("font_color", Color("#9fe8ff"))
+		line.add_child(right)
+		row.add_child(line)
+		_shop_rows_box.add_child(row)
+		_shop_rows.append([row, left, right])
+	column.add_child(_shop_rows_box)
+	_shop_hint = _make_label(15)
+	_shop_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_shop_hint.modulate = Color(1, 1, 1, 0.6)
+	column.add_child(_shop_hint)
+	_shop_panel.add_child(column)
+	add_child(_shop_panel)
+
+
+func _set_shop_focus(index: int) -> void:
+	if _shop_count <= 0:
+		return
+	var new_focus := wrapi(index, 0, _shop_count)
+	if _shop_panel.visible and new_focus != _shop_focus and game != null:
+		game.play_sound("hover")
+	_shop_focus = new_focus
+	for i in _shop_rows.size():
+		var row: PanelContainer = _shop_rows[i][0]
+		row.add_theme_stylebox_override("panel", _row_style(i == _shop_focus, bool(row.get_meta("locked", false))))
+
+
+func show_shop(title: String, rows: Array, hint: String, selected: int) -> void:
+	_shop_title.text = title
+	_shop_hint.text = hint
+	_shop_count = mini(rows.size(), _shop_rows.size())
+	for i in _shop_rows.size():
+		var row: PanelContainer = _shop_rows[i][0]
+		if i < rows.size():
+			var data: Dictionary = rows[i]
+			var left: Label = _shop_rows[i][1]
+			var right: Label = _shop_rows[i][2]
+			var text := str(data["title"])
+			if str(data.get("text", "")) != "":
+				text += "  —  " + str(data["text"])
+			left.text = text
+			right.text = str(data.get("right", ""))
+			var locked := bool(data.get("locked", false))
+			row.set_meta("locked", locked)
+			left.modulate = Color(1, 1, 1, 0.55) if locked else Color.WHITE
+			right.modulate = Color(1, 1, 1, 0.55) if locked else Color.WHITE
+			row.visible = true
+		else:
+			row.visible = false
+	_shop_panel.visible = true
+	_prompt_label.visible = false
+	_set_shop_focus(clampi(selected, 0, maxi(_shop_count - 1, 0)))
+
+
+func hide_shop() -> void:
+	_shop_panel.visible = false
 
 
 func _process(delta: float) -> void:
@@ -381,26 +500,31 @@ func _input(event: InputEvent) -> void:
 			elif key == KEY_ENTER or key == KEY_KP_ENTER or key == KEY_SPACE:
 				game.choose_upgrade(_levelup_focus)
 		"menu":
-			if key == KEY_LEFT or key == KEY_A:
-				game.menu_map(-1)
-			elif key == KEY_RIGHT or key == KEY_D:
-				game.menu_map(1)
-			elif key == KEY_UP or key == KEY_W:
-				game.menu_skin(-1)
+			if key == KEY_ENTER or key == KEY_KP_ENTER or key == KEY_SPACE:
+				game.to_base()
+		"base":
+			if key == KEY_E or key == KEY_ENTER or key == KEY_KP_ENTER or key == KEY_SPACE:
+				game.interact()
+		"shop":
+			if key == KEY_UP or key == KEY_W:
+				_set_shop_focus(_shop_focus - 1)
 			elif key == KEY_DOWN or key == KEY_S:
-				game.menu_skin(1)
+				_set_shop_focus(_shop_focus + 1)
 			elif key == KEY_ENTER or key == KEY_KP_ENTER or key == KEY_SPACE:
-				game.start_game()
+				game.shop_pick(_shop_focus)
+			elif key == KEY_ESCAPE or key == KEY_E or key == KEY_BACKSPACE:
+				game.close_shop()
 		"won", "over":
 			if key == KEY_R:
 				game.restart()
 			elif key == KEY_ENTER or key == KEY_KP_ENTER or key == KEY_SPACE:
-				game.to_menu()
+				game.to_base()
 
 
 func set_values(hp: float, max_hp: float, xp: int, xp_needed: int, level: int, time_left: float, kills: int, enemies: int, best: int) -> void:
 	_hp_bar.value = hp / maxf(max_hp, 1.0)
-	_hp_label.text = "Здоровье %d / %d" % [int(ceil(hp)), int(max_hp)]
+	var shield := float(game.player.shield) if game != null and game.player != null else 0.0
+	_hp_label.text = "Здоровье %d / %d" % [int(ceil(hp)), int(max_hp)] + ("  · щит %d" % int(ceil(shield)) if shield > 0.0 else "")
 	_xp_bar.value = float(xp) / maxf(float(xp_needed), 1.0)
 	_time_label.text = "%d:%02d" % [int(time_left) / 60, int(time_left) % 60]
 	_level_label.text = "Уровень %d" % level
@@ -460,34 +584,49 @@ func hide_levelup() -> void:
 	_levelup_panel.visible = false
 
 
-func show_menu(map_number: int, map_count: int, map_title: String, map_subtitle: String, best: int, won: bool, skin_title: String) -> void:
-	_menu_map.text = "◀  %d/%d  %s  ▶" % [map_number, map_count, map_title]
-	_menu_subtitle.text = map_subtitle
-	_menu_skin.text = "▲ Герой: %s ▼" % skin_title
-	var record_text := "Рекорд: %d" % best if best > 0 else "Рекорда пока нет"
-	_menu_best.text = record_text + ("  ·  ✓ пройдена" if won else "")
+func show_menu(souls: int, nights: int) -> void:
+	_menu_souls.text = "✦ Души: %d" % souls + ("  ·  ночей позади: %d" % nights if nights > 0 else "")
 	_menu_panel.visible = true
-	_hp_bar.visible = false
-	_hp_label.visible = false
-	_map_label.visible = false
-	_xp_bar.visible = false
-	_time_label.visible = false
-	_level_label.visible = false
-	_kills_label.visible = false
-	_best_label.visible = false
+	_set_hud_visible(false)
+	_souls_label.visible = false
 
 
 func set_map_title(title: String) -> void:
 	_map_label.text = title
 
 
+func set_souls(souls: int) -> void:
+	_souls_label.text = "✦ %d" % souls
+
+
+func _set_hud_visible(shown: bool) -> void:
+	_hp_bar.visible = shown
+	_hp_label.visible = shown
+	_map_label.visible = shown
+	_xp_bar.visible = shown
+	_time_label.visible = shown
+	_level_label.visible = shown
+	_kills_label.visible = shown
+	_best_label.visible = shown
+	_souls_label.visible = shown
+
+
 func hide_menu() -> void:
 	_menu_panel.visible = false
-	_hp_bar.visible = true
-	_hp_label.visible = true
+	_set_hud_visible(true)
+
+
+## Табло форпоста: только души и название, подсказка у зданий.
+func show_base(souls: int) -> void:
+	_menu_panel.visible = false
+	_set_hud_visible(false)
 	_map_label.visible = true
-	_xp_bar.visible = true
-	_time_label.visible = true
-	_level_label.visible = true
-	_kills_label.visible = true
-	_best_label.visible = true
+	_map_label.text = "Форпост"
+	_souls_label.visible = true
+	_souls_label.offset_top = 10
+	set_souls(souls)
+
+
+func set_prompt(text: String) -> void:
+	_prompt_label.text = text
+	_prompt_label.visible = text != "" and not _shop_panel.visible
