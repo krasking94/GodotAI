@@ -24,6 +24,8 @@ var _levelup_title: Label
 var _levelup_cards: Array = []  # [PanelContainer, UpgradeIcon, Label заголовок, Label описание, Label «Рекомендуется»]
 var _levelup_focus := 0
 var _levelup_count := 3
+var _relic_arrow: RelicArrow
+var _relic_label: Label
 var _menu_panel: PanelContainer
 var _menu_skin: Label
 var _menu_best: Label
@@ -88,6 +90,24 @@ func _ready() -> void:
 	_message.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_message.visible = false
 	add_child(_message)
+	_relic_arrow = RelicArrow.new()
+	_relic_arrow.custom_minimum_size = Vector2(36, 36)
+	_relic_arrow.size = Vector2(36, 36)
+	_relic_arrow.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_relic_arrow.offset_left = -18
+	_relic_arrow.offset_right = 18
+	_relic_arrow.offset_top = 60
+	_relic_arrow.offset_bottom = 96
+	_relic_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_relic_arrow.visible = false
+	add_child(_relic_arrow)
+	_relic_label = _make_label(16)
+	_relic_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_relic_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_relic_label.offset_top = 96
+	_relic_label.add_theme_color_override("font_color", Color("#d9a6ff"))
+	_relic_label.visible = false
+	add_child(_relic_label)
 	_build_levelup()
 	_build_menu()
 
@@ -183,6 +203,19 @@ class UpgradeIcon extends Control:
 				draw_rect(Rect2(c + Vector2(-r * 0.52, -r * 0.13), Vector2(r * 1.04, r * 0.26)), color)
 			_:
 				draw_circle(c, r * 0.3, color)
+
+
+## Стрелка к реликвии под таймером: лиловый треугольник, повёрнутый в сторону реликвии.
+class RelicArrow extends Control:
+	var angle := 0.0
+
+	func _draw() -> void:
+		var c := size * 0.5
+		var r := minf(size.x, size.y) * 0.5
+		var points := PackedVector2Array()
+		for p in [Vector2(r, 0), Vector2(-r * 0.7, r * 0.6), Vector2(-r * 0.3, 0), Vector2(-r * 0.7, -r * 0.6)]:
+			points.append(c + p.rotated(angle))
+		draw_polygon(points, PackedColorArray([Color("#c070ff")]))
 
 
 func _card_style(color: Color, focused: bool) -> StyleBoxFlat:
@@ -349,6 +382,16 @@ func set_values(hp: float, max_hp: float, xp: int, xp_needed: int, level: int, t
 	_level_label.text = "Уровень %d" % level
 	_kills_label.text = "Убито %d · врагов %d" % [kills, enemies]
 	_best_label.text = "Рекорд %d" % best if best > 0 else ""
+
+
+## Стрелка и расстояние до реликвии (angle в экранных осях: 0 — вправо, вниз — положительный).
+func set_relic(shown: bool, angle: float, distance: float) -> void:
+	_relic_arrow.visible = shown
+	_relic_label.visible = shown
+	if shown:
+		_relic_arrow.angle = angle
+		_relic_arrow.queue_redraw()
+		_relic_label.text = "Реликвия: %d м" % int(distance)
 
 
 func flash() -> void:

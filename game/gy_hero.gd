@@ -151,6 +151,15 @@ func _autopilot_direction() -> Vector3:
 			var radial := (-p.normalized() if r > 0.1 else Vector2.ZERO) * clampf(r - 7.0, -1.0, 1.0)
 			var d := (tangent + radial).normalized()
 			return Vector3(d.x, 0, d.y)
+		"relic":
+			var relic: Node3D = game.get("relic")
+			if relic == null:
+				autopilot = "circle"
+				var d := _autopilot_direction()
+				autopilot = "relic"
+				return d
+			var to := Vector2(relic.global_position.x - global_position.x, relic.global_position.z - global_position.z)
+			return Vector3(to.normalized().x, 0, to.normalized().y)
 		"away":
 			var enemy := _nearest_enemy()
 			var d := Vector2.ZERO

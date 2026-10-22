@@ -36,6 +36,7 @@ const ENEMY_KINDS := {
 	"ghoul": {"model": "zombie", "title": "Гуль", "tint": "#6f9a4a", "hp": 90.0, "speed": 1.3, "damage": 18.0, "xp": 10, "scale": 2.4, "from": 45.0, "weight": 0.7, "elite": true},
 	"knight": {"model": "skeleton", "title": "Рыцарь-скелет", "tint": "#a9bddb", "hp": 60.0, "speed": 2.4, "damage": 12.0, "xp": 8, "scale": 2.0, "from": 75.0, "weight": 0.7, "elite": true},
 	"wraith": {"model": "ghost", "title": "Жнец", "tint": "#c070ff", "hp": 45.0, "speed": 3.4, "damage": 10.0, "xp": 15, "scale": 2.0, "from": 100.0, "weight": 0.45, "ghost": true, "elite": true, "light": "#b060ff"},
+	"guard": {"model": "skeleton", "title": "Сторож", "tint": "#ff6a4a", "hp": 40.0, "speed": 5.5, "damage": 0.0, "xp": 12, "scale": 1.7, "from": 0.0, "weight": 0.0, "guard": true, "light": "#ff4a2a"},
 	"vampire": {"model": "vampire", "title": "Вампир", "hp": 700.0, "speed": 2.4, "damage": 25.0, "xp": 60, "scale": 3.2, "from": 0.0, "weight": 0.0, "boss": true, "light": "#ff3a3a"},
 }
 const UPGRADES := [
@@ -49,6 +50,10 @@ const UPGRADES := [
 	{"id": "regen", "title": "Восстановление", "text": "+1 здоровья в секунду"},
 ]
 const ARENA := 34.0  # половина стороны кладбища, по краю ограда
+const RELIC_FIRST := 25.0  # первая реликвия на этой секунде (--test graveyard=relic:сек меняет)
+const RELIC_EVERY := 40.0  # пауза до следующей после того, как взяли или исчезла
+const RELIC_LIFETIME := 30.0  # сколько лежит, последние 5 с мигает
+const RELIC_COLOR := Color("#c070ff")
 const SPAWN_MIN := 17.0
 const SPAWN_MAX := 22.0
 const MAX_ENEMIES := 90
@@ -79,7 +84,7 @@ var bolts_root: Node3D
 
 const Fx := preload("res://game/gy_fx.gd")
 ## Цвет искр, которыми рассыпается погибший враг.
-const DEATH_COLORS := {"zombie": "#7cff5a", "skeleton": "#ffffff", "ghost": "#8ad8ff", "ghoul": "#a6ff3a", "knight": "#cfe4ff", "wraith": "#d08cff", "vampire": "#ff3a3a"}
+const DEATH_COLORS := {"zombie": "#7cff5a", "skeleton": "#ffffff", "ghost": "#8ad8ff", "ghoul": "#a6ff3a", "knight": "#cfe4ff", "wraith": "#d08cff", "guard": "#ff6a4a", "vampire": "#ff3a3a"}
 
 var _spawn_budget := 0.0
 var _report_every := 0.0
@@ -99,6 +104,12 @@ var _fires: Array = []  # [OmniLight3D, фаза] для мерцания
 var _soul_material: StandardMaterial3D
 var _solid_spots: Array = []  # Vector2 занятых мест, чтобы украшения не лезли друг в друга
 var _seen_kinds := {}  # какие виды врагов уже объявлялись на табло
+var relic: Node3D = null  # реликвия на земле (пол-шкалы опыта), её сторожит быстрый скелет
+var _relic_timer := RELIC_FIRST
+var _relic_age := 0.0
+var _relic_orb: MeshInstance3D
+var _relic_light: OmniLight3D
+var _guard: Node3D = null
 var _fx_root: Node3D
 var _fireflies: CPUParticles3D
 var _leaves: CPUParticles3D
@@ -123,6 +134,7 @@ func _ready() -> void:
 	boss_time = float(test_options["boss"]) if test_options.has("boss") else round_seconds * 0.8
 	_report_every = float(test_options.get("report", 0.0))
 	_forced_levelup = float(test_options.get("levelup", 0.0))  # на этой секунде открыть окно прокачки (для снимков)
+	_relic_timer = float(test_options.get("relic", RELIC_FIRST))
 	hold_levelup = _forced_levelup > 0.0
 	auto = test_options.has("auto") or test_options.has("move")
 	best_score = _load_best()
@@ -454,6 +466,7 @@ func _process(delta: float) -> void:
 		_gain_xp(xp_needed - xp)
 	_spawn(delta)
 	_update_souls(delta)
+	_update_relic(delta)
 	if hud != null:
 		hud.set_values(player.hp, player.max_hp, xp, xp_needed, level, maxf(round_seconds - elapsed, 0.0), kills, enemies.size(), best_score)
 	if _report_every > 0.0:
@@ -513,11 +526,13 @@ func _pick_kind() -> String:
 	return "zombie"
 
 
-func _spawn_enemy(kind: String) -> void:
+func _spawn_enemy(kind: String, at: Vector3 = Vector3.INF) -> Node3D:
 	var enemy := Enemy.new()
 	var angle := _rng.randf_range(0, TAU)
 	var radius := _rng.randf_range(SPAWN_MIN, SPAWN_MAX)
 	var pos := player.global_position + Vector3(cos(angle) * radius, 0, sin(angle) * radius)
+	if at != Vector3.INF:
+		pos = at
 	pos.x = clampf(pos.x, -ARENA + 1.5, ARENA - 1.5)
 	pos.z = clampf(pos.z, -ARENA + 1.5, ARENA - 1.5)
 	pos.y = 0.05
@@ -532,6 +547,7 @@ func _spawn_enemy(kind: String) -> void:
 		if hud != null:
 			hud.show_banner("Новый враг: %s (+%d опыта)" % [str(stats["title"]), int(stats["xp"])])
 		print("Новый враг: %s на %d с" % [str(stats["title"]), int(elapsed)])
+	return enemy
 
 
 func on_enemy_died(enemy: Node3D) -> void:
@@ -550,7 +566,7 @@ func on_enemy_died(enemy: Node3D) -> void:
 		_spawn_soul(pos + Vector3(0.6, 0, 0), 0, "pumpkin")
 	if enemy.is_boss:
 		pass
-	elif enemy.is_elite:
+	elif enemy.is_elite or enemy.is_guard:
 		play_sound("die_elite")
 	else:
 		play_sound("die_" + str(ENEMY_KINDS[enemy.kind].get("model", "zombie")))
@@ -615,6 +631,114 @@ func _collect(soul: Node3D) -> void:
 		_gain_xp(int(soul.get_meta("value")))
 		play_sound("soul")
 	soul.queue_free()
+
+
+# --- Реликвия: редкий бонус на пол-шкалы опыта под охраной быстрого скелета ---
+
+func _update_relic(delta: float) -> void:
+	if relic == null:
+		_relic_timer -= delta
+		if _relic_timer <= 0.0:
+			_spawn_relic()
+		if hud != null:
+			hud.set_relic(false, 0.0, 0.0)
+		return
+	_relic_age += delta
+	_relic_orb.position.y = 1.25 + sin(_relic_age * 2.5) * 0.12
+	_relic_orb.rotation.y += delta * 1.5
+	_relic_light.light_energy = 1.3 + sin(_relic_age * 5.0) * 0.35
+	if _relic_age > RELIC_LIFETIME - 5.0:
+		_relic_orb.visible = fmod(_relic_age, 0.4) < 0.25
+	var to := player.global_position - relic.global_position
+	to.y = 0
+	if hud != null:
+		hud.set_relic(true, atan2(-to.z, -to.x), to.length())
+	if to.length() < 1.3:
+		_take_relic()
+	elif _relic_age > RELIC_LIFETIME:
+		print("Реликвия исчезла")
+		_remove_relic()
+
+
+## Реликвия ложится в 12–26 м от героя, не на украшения; рядом появляется Сторож и кружит вокруг неё.
+func _spawn_relic() -> void:
+	var player_p := Vector2(player.global_position.x, player.global_position.z)
+	var spot := Vector2.INF
+	for attempt in 60:
+		var p := Vector2(_rng.randf_range(-ARENA + 4.0, ARENA - 4.0), _rng.randf_range(-ARENA + 4.0, ARENA - 4.0))
+		var d := p.distance_to(player_p)
+		if d < 12.0 or d > 26.0:
+			continue
+		var ok := true
+		for solid in _solid_spots:
+			if p.distance_to(solid) < 2.2:
+				ok = false
+				break
+		if ok:
+			spot = p
+			break
+	if spot == Vector2.INF:
+		_relic_timer = 5.0
+		return
+	relic = Node3D.new()
+	relic.name = "Relic"
+	if ResourceLoader.exists(MODELS + "altarStone.glb"):
+		var altar: Node3D = (load(MODELS + "altarStone.glb") as PackedScene).instantiate()
+		altar.scale = Vector3.ONE * 1.2
+		relic.add_child(altar)
+	var orb_material := StandardMaterial3D.new()
+	orb_material.albedo_color = RELIC_COLOR
+	orb_material.emission_enabled = true
+	orb_material.emission = RELIC_COLOR
+	orb_material.emission_energy_multiplier = 3.0
+	_relic_orb = MeshInstance3D.new()
+	var prism := PrismMesh.new()
+	prism.size = Vector3(0.6, 0.8, 0.6)
+	_relic_orb.mesh = prism
+	_relic_orb.material_override = orb_material
+	_relic_orb.position = Vector3(0, 1.25, 0)
+	relic.add_child(_relic_orb)
+	_relic_light = OmniLight3D.new()
+	_relic_light.light_color = RELIC_COLOR
+	_relic_light.light_energy = 1.3
+	_relic_light.omni_range = 7.0
+	_relic_light.position = Vector3(0, 1.6, 0)
+	relic.add_child(_relic_light)
+	_souls_root.add_child(relic)
+	relic.global_position = Vector3(spot.x, 0, spot.y)
+	_relic_age = 0.0
+	var guard_pos := Vector3(spot.x, 0.05, spot.y) + Vector3(2.8, 0, 0)
+	_guard = _spawn_enemy("guard", guard_pos)
+	_guard.guard_target = relic
+	play_sound("alert")
+	if hud != null:
+		hud.show_banner("Реликвия! Пол-шкалы опыта, но её сторожит Сторож: удар отнимает полжизни")
+	print("Реликвия появилась в (%.0f, %.0f) на %d с, сторож рядом" % [spot.x, spot.y, int(elapsed)])
+
+
+func _take_relic() -> void:
+	var bonus := ceili(float(xp_needed) * 0.5)
+	spawn_burst(relic.global_position + Vector3(0, 1.2, 0), RELIC_COLOR, 2.0)
+	play_sound("relic")
+	if hud != null:
+		hud.show_banner("Реликвия взята: +%d опыта!" % bonus)
+	print("Реликвия взята на %d с: +%d опыта" % [int(elapsed), bonus])
+	_remove_relic()
+	_gain_xp(bonus)
+
+
+func _remove_relic() -> void:
+	if _guard != null and is_instance_valid(_guard):
+		_guard.guard_target = null  # сторож остаётся и гонится за героем, но уже медленнее героя
+		_guard.speed = 4.2
+		if hud != null:
+			hud.show_banner("Сторож гонится за тобой: убегай или стреляй!")
+	_guard = null
+	relic.queue_free()
+	relic = null
+	_relic_timer = RELIC_EVERY
+	if hud != null:
+		hud.set_relic(false, 0.0, 0.0)
 
 
 func _gain_xp(amount: int) -> void:
