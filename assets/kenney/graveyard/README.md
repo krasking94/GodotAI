@@ -4,9 +4,9 @@
 взято из зеркала наборов Kenney на GitHub ([ETdoFresh/kenney.nl](https://github.com/ETdoFresh/kenney.nl)),
 потому что сам kenney.nl из облака недоступен. Лицензии лежат рядом.
 
-- `models/*.glb` — 45 моделей из *Graveyard Kit 3.0*: нежить (`zombie`, `skeleton`, `ghost`, `vampire`, ростом
+- `models/*.glb` — 46 моделей из *Graveyard Kit 3.0*: нежить (`zombie`, `skeleton`, `ghost`, `vampire`, ростом
   около 0,8 м, в игре увеличены), надгробия, кресты, склеп, гробы, сосны, камни, скамейки, фонари
-  (`lightpostSingle`, `lanternCandle`, `fireBasket`), тыквы, ограда (`ironFence`). Godot импортирует `.glb` сам.
+  (`lightpostSingle`, `lanternCandle`, `fireBasket`), тыквы, ограда (`ironFence`), плитка дорожки (`road`). Godot импортирует `.glb` сам.
   Кладбище расставляет их кодом `game/gy_game.gd`, врагов собирает `game/gy_enemy.gd`.
 - `sounds/*.ogg` — `bolt` (zap1) и `hurt` (lowDown), `pickup` (pepSound3), `levelup` (powerUp5), `over`
   (lowThreeTone) из *Digital Audio*; `hit` (impactPunch_medium) , `die` (impactSoft_heavy), `boss`

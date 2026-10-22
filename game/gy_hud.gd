@@ -188,7 +188,7 @@ func _process(delta: float) -> void:
 		if _banner_timer <= 0.0:
 			_banner.visible = false
 	if _flash_rect.color.a > 0.0:
-		_flash_rect.color.a = maxf(_flash_rect.color.a - delta * 1.5, 0.0)
+		_flash_rect.color.a = maxf(_flash_rect.color.a - delta * 2.5, 0.0)
 	if game != null and str(game.get("state")) == "levelup" and bool(game.get("auto")):
 		_auto_timer += delta
 		if _auto_timer >= 0.3:
@@ -232,7 +232,7 @@ func set_values(hp: float, max_hp: float, xp: int, xp_needed: int, level: int, t
 
 
 func flash() -> void:
-	_flash_rect.color.a = 0.35
+	_flash_rect.color.a = 0.22
 
 
 func show_banner(text: String) -> void:
